@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using DirectoryAnalyzer.Services;
 
 namespace DirectoryAnalyzer.ViewModels
 {
@@ -40,6 +41,15 @@ namespace DirectoryAnalyzer.ViewModels
             storage = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
             return true;
+        }
+
+        protected void SetStatus(string detailedMessage, string globalStatus)
+        {
+            StatusMessage = detailedMessage;
+            if (!string.IsNullOrWhiteSpace(globalStatus))
+            {
+                StatusService.Instance.SetStatus(globalStatus);
+            }
         }
     }
 }

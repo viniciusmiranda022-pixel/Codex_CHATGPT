@@ -13,7 +13,7 @@ namespace DirectoryAnalyzer
             InitializeComponent();
             if (NavigationMenu.Items.Count > 0)
             {
-                NavigationMenu.SelectedIndex = 0;
+                NavigationMenu.SelectedIndex = 1;
             }
         }
 
@@ -24,6 +24,11 @@ namespace DirectoryAnalyzer
                 return;
             }
             
+            if (selectedItem.Content == null)
+            {
+                return;
+            }
+
             string selectedContent = selectedItem.Content.ToString();
             
             switch (selectedContent)
