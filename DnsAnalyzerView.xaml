@@ -48,7 +48,7 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <TabControl x:Name="ReportTabs" SelectedIndex="{Binding SelectedTabIndex}">
+                <TabControl x:Name="ReportTabs" Grid.Row="0" SelectedIndex="{Binding SelectedTabIndex}">
                     <TabItem Header="Zonas">
                         <DataGrid x:Name="ZonasGrid" AutoGenerateColumns="True" ItemsSource="{Binding Zones}"/>
                     </TabItem>
