@@ -5,11 +5,10 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              mc:Ignorable="d" 
              d:DesignHeight="500" d:DesignWidth="800"
-             Background="#f7f7f7">
+             Background="{StaticResource BackgroundBrush}">
 
-    <Grid Margin="20">
+    <Grid Margin="0">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -17,68 +16,40 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <DockPanel Grid.Row="0" Margin="0,0,0,10">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="🤝" FontSize="20" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                <TextBlock Text="Directory Analyzer - Trusts"
-                           FontSize="20"
-                           FontWeight="Bold"
-                           Foreground="#111111"
-                           VerticalAlignment="Center"/>
-            </StackPanel>
-        </DockPanel>
-
-        <Button Grid.Row="1"
-                Content="▶ Executar Análise de Relações de Confiança"
-                Click="RunTrustsCollection"
-                Background="#0078D7"
-                Foreground="White"
-                FontWeight="SemiBold"
-                Padding="12,6"
-                BorderThickness="0"
-                Cursor="Hand"
-                HorizontalAlignment="Left"
-                Margin="0,0,0,10"/>
+        <Border Grid.Row="0" Style="{StaticResource CardStyle}">
+            <DockPanel LastChildFill="False">
+                <StackPanel>
+                    <TextBlock Text="Trusts Analyzer" Style="{StaticResource TitleTextStyle}"/>
+                    <TextBlock Text="Relações de confiança e configurações." Style="{StaticResource SubtitleTextStyle}" Margin="0,6,0,0"/>
+                </StackPanel>
+                <Button DockPanel.Dock="Right"
+                        Content="Executar Coleta"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        Click="RunTrustsCollection"/>
+            </DockPanel>
+        </Border>
 
         <TextBlock x:Name="ProgressText"
-                   Grid.Row="2"
-                   Text="⏳ Coletando informações de relações de confiança..."
-                   FontStyle="Italic"
-                   Foreground="#4a90e2"
+                   Grid.Row="1"
+                   Text="⏳ Coletando informações de trusts..."
+                   Style="{StaticResource CaptionTextStyle}"
+                   Foreground="{StaticResource PrimaryBrush}"
                    Visibility="Collapsed"
-                   Margin="0,0,0,10"/>
+                   Margin="6,12,0,0"/>
 
-        <DataGrid x:Name="TrustsGrid"
-                  Grid.Row="3"
-                  IsReadOnly="True"
-                  AutoGenerateColumns="False"
-                  CanUserAddRows="False"
-                  HeadersVisibility="Column"
-                  FontSize="13"
-                  RowBackground="#ffffff"
-                  AlternatingRowBackground="#f0f0f0">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Domínio de Origem" Binding="{Binding Source}" Width="2*"/>
-                <DataGridTextColumn Header="Domínio de Destino" Binding="{Binding Target}" Width="2*"/>
-                <DataGridTextColumn Header="Direção" Binding="{Binding Direction}" Width="*"/>
-                <DataGridTextColumn Header="Tipo" Binding="{Binding TrustType}" Width="*"/>
-                <DataGridCheckBoxColumn Header="Transitivo" Binding="{Binding IsTransitive}" Width="Auto"/>
-            </DataGrid.Columns>
-        </DataGrid>
+        <Border Grid.Row="2" Style="{StaticResource CardStyle}" Margin="0,16,0,0">
+            <DataGrid x:Name="TrustsGrid" AutoGenerateColumns="True"/>
+        </Border>
 
-        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
-            <Button Content="🗎 Exportar CSV" Margin="5,0" Padding="10,6" Click="ExportCsv_Click" Background="#ffffff" BorderBrush="#0078D7" Foreground="#0078D7" BorderThickness="1" FontWeight="SemiBold" Cursor="Hand"/>
-            <Button Content="🗐 Exportar XML" Margin="5,0" Padding="10,6" Click="ExportXml_Click" Background="#ffffff" BorderBrush="#0078D7" Foreground="#0078D7" BorderThickness="1" FontWeight="SemiBold" Cursor="Hand"/>
-            <Button Content="🌐 Exportar HTML" Margin="5,0" Padding="10,6" Click="ExportHtml_Click" Background="#ffffff" BorderBrush="#0078D7" Foreground="#0078D7" BorderThickness="1" FontWeight="SemiBold" Cursor="Hand"/>
-            <Button Content="🛢 Exportar SQL" Margin="5,0" Padding="10,6" Click="ExportSql_Click" Background="#ffffff" BorderBrush="#0078D7" Foreground="#0078D7" BorderThickness="1" FontWeight="SemiBold" Cursor="Hand"/>
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="Exportar CSV" Style="{StaticResource OutlineButtonStyle}" Click="ExportCsv_Click"/>
+            <Button Content="Exportar XML" Style="{StaticResource OutlineButtonStyle}" Click="ExportXml_Click" Margin="10,0,0,0"/>
+            <Button Content="Exportar HTML" Style="{StaticResource OutlineButtonStyle}" Click="ExportHtml_Click" Margin="10,0,0,0"/>
+            <Button Content="Exportar SQL" Style="{StaticResource OutlineButtonStyle}" Click="ExportSql_Click" Margin="10,0,0,0"/>
         </StackPanel>
 
-        <Border Grid.Row="5" Background="#e9f1fb" CornerRadius="4" Padding="10" Margin="0,10,0,0">
-            <TextBlock x:Name="StatusText"
-                       Text="✔️ Pronto para iniciar a coleta."
-                       FontSize="13"
-                       Foreground="#004d99"
-                       VerticalAlignment="Center"/>
+        <Border Grid.Row="4" Style="{StaticResource CardStyle}" Margin="0,16,0,0" Padding="12">
+            <TextBlock x:Name="StatusText" Text="✔️ Pronto para iniciar a coleta." Style="{StaticResource CaptionTextStyle}"/>
         </Border>
     </Grid>
 </UserControl>

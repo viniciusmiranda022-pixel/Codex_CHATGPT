@@ -3,12 +3,14 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace DirectoryAnalyzer.Services
 {
     public enum LogLevel
     {
+        Debug,
         Info,
         Warn,
         Error
@@ -16,18 +18,22 @@ namespace DirectoryAnalyzer.Services
 
     public sealed class LogEntry
     {
-        public LogEntry(DateTime timestamp, string moduleName, LogLevel level, string message)
+        public LogEntry(DateTime timestamp, LogLevel level, string className, string methodName, string message, string correlationId)
         {
             Timestamp = timestamp;
-            ModuleName = moduleName;
             Level = level;
+            ClassName = className;
+            MethodName = methodName;
             Message = message;
+            CorrelationId = correlationId;
         }
 
         public DateTime Timestamp { get; }
-        public string ModuleName { get; }
         public LogLevel Level { get; }
+        public string ClassName { get; }
+        public string MethodName { get; }
         public string Message { get; }
+        public string CorrelationId { get; }
     }
 
     public interface ILogService
@@ -35,10 +41,11 @@ namespace DirectoryAnalyzer.Services
         string ModuleName { get; }
         event EventHandler<LogEntry> EntryAdded;
         IReadOnlyCollection<LogEntry> Buffer { get; }
-        void Info(string message);
-        void Warn(string message);
-        void Error(string message);
-        void Write(LogLevel level, string message);
+        void Debug(string message, string correlationId = null, [CallerMemberName] string memberName = null, [CallerFilePath] string sourceFilePath = null);
+        void Info(string message, string correlationId = null, [CallerMemberName] string memberName = null, [CallerFilePath] string sourceFilePath = null);
+        void Warn(string message, string correlationId = null, [CallerMemberName] string memberName = null, [CallerFilePath] string sourceFilePath = null);
+        void Error(string message, string correlationId = null, [CallerMemberName] string memberName = null, [CallerFilePath] string sourceFilePath = null);
+        void Write(LogLevel level, string message, string correlationId = null, [CallerMemberName] string memberName = null, [CallerFilePath] string sourceFilePath = null);
     }
 
     public sealed class LogService : ILogService
@@ -60,7 +67,7 @@ namespace DirectoryAnalyzer.Services
             _bufferCapacity = Math.Max(1, bufferCapacity);
             _buffer = new ConcurrentQueue<LogEntry>();
 
-            string logRoot = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs", moduleName);
+            string logRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DirectoryAnalyzer", "Logs", moduleName);
             Directory.CreateDirectory(logRoot);
             _filePath = Path.Combine(logRoot, $"{moduleName}_{RunId}.log");
         }
@@ -87,16 +94,25 @@ namespace DirectoryAnalyzer.Services
             logger.Write(level, message);
         }
 
-        public void Info(string message) => Write(LogLevel.Info, message);
+        public void Debug(string message, string correlationId = null, [CallerMemberName] string memberName = null, [CallerFilePath] string sourceFilePath = null)
+            => Write(LogLevel.Debug, message, correlationId, memberName, sourceFilePath);
 
-        public void Warn(string message) => Write(LogLevel.Warn, message);
+        public void Info(string message, string correlationId = null, [CallerMemberName] string memberName = null, [CallerFilePath] string sourceFilePath = null)
+            => Write(LogLevel.Info, message, correlationId, memberName, sourceFilePath);
 
-        public void Error(string message) => Write(LogLevel.Error, message);
+        public void Warn(string message, string correlationId = null, [CallerMemberName] string memberName = null, [CallerFilePath] string sourceFilePath = null)
+            => Write(LogLevel.Warn, message, correlationId, memberName, sourceFilePath);
 
-        public void Write(LogLevel level, string message)
+        public void Error(string message, string correlationId = null, [CallerMemberName] string memberName = null, [CallerFilePath] string sourceFilePath = null)
+            => Write(LogLevel.Error, message, correlationId, memberName, sourceFilePath);
+
+        public void Write(LogLevel level, string message, string correlationId = null, [CallerMemberName] string memberName = null, [CallerFilePath] string sourceFilePath = null)
         {
             string safeMessage = message ?? string.Empty;
-            var entry = new LogEntry(DateTime.Now, ModuleName, level, safeMessage);
+            string className = ResolveClassName(sourceFilePath);
+            string methodName = string.IsNullOrWhiteSpace(memberName) ? "Unknown" : memberName;
+            string safeCorrelationId = string.IsNullOrWhiteSpace(correlationId) ? "N/A" : correlationId;
+            var entry = new LogEntry(DateTime.Now, level, className, methodName, safeMessage, safeCorrelationId);
 
             WriteToFile(entry);
             if (_bufferEnabled)
@@ -112,11 +128,26 @@ namespace DirectoryAnalyzer.Services
 
         private void WriteToFile(LogEntry entry)
         {
-            string line = $"{entry.Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{entry.Level}] {entry.Message}";
+            string line = $"{entry.Timestamp:yyyy-MM-dd HH:mm:ss.fff} | {entry.Level} | {entry.ClassName} | {entry.MethodName} | {entry.CorrelationId} | {entry.Message}";
             lock (FileLock)
             {
                 File.AppendAllText(_filePath, line + Environment.NewLine, new UTF8Encoding(true));
             }
+        }
+
+        public static string CreateCorrelationId()
+        {
+            return Guid.NewGuid().ToString("N");
+        }
+
+        private static string ResolveClassName(string sourceFilePath)
+        {
+            if (string.IsNullOrWhiteSpace(sourceFilePath))
+            {
+                return "Unknown";
+            }
+
+            return Path.GetFileNameWithoutExtension(sourceFilePath) ?? "Unknown";
         }
     }
 }
