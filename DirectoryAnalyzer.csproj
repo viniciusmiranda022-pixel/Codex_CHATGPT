@@ -30,6 +30,21 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Update="Services\LogService.cs" />
+    <Compile Update="Services\PowerShellService.cs" />
+    <Compile Update="ViewModels\AsyncRelayCommand.cs" />
+    <Compile Update="ViewModels\BaseAnalyzerViewModel.cs" />
+    <Compile Update="ViewModels\DnsAnalyzerViewModel.cs" />
+    <Compile Update="ViewModels\RelayCommand.cs" />
+    <Compile Update="Modules\ICollector.cs" />
+    <Compile Update="Modules\Dns\DnsCollector.cs" />
+    <Compile Update="Models\DnsForwarderResult.cs" />
+    <Compile Update="Models\DnsRecordResult.cs" />
+    <Compile Update="Models\DnsReport.cs" />
+    <Compile Update="Models\DnsZoneResult.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
 </Project>
