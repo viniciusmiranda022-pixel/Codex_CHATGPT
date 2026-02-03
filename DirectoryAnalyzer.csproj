@@ -3,9 +3,14 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net48</TargetFramework>
     <UseWPF>true</UseWPF>
-    <!-- Keep Properties\AssemblyInfo.cs as the single source of truth. -->
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+
+    <AssemblyTitle>DirectoryAnalyzer</AssemblyTitle>
+    <Product>DirectoryAnalyzer</Product>
+    <Company>DirectoryAnalyzer</Company>
+    <AssemblyConfiguration></AssemblyConfiguration>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <InformationalVersion>1.0.0.0</InformationalVersion>
 
     <!-- Atualização aqui: C# mais recente -->
     <LangVersion>latest</LangVersion>
