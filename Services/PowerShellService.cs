@@ -6,6 +6,7 @@ using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace DirectoryAnalyzer.Services
 {
@@ -67,6 +68,7 @@ namespace DirectoryAnalyzer.Services
     public class PowerShellService
     {
         private static readonly object ExecutionLock = new object();
+        private static readonly ILogService Logger = LogService.CreateLogger("PowerShell");
         private static readonly string[] SensitiveParameterTokens =
         {
             "password",
@@ -205,6 +207,13 @@ namespace DirectoryAnalyzer.Services
 
                 var sanitizedScript = SanitizeScriptForLogging(scriptText);
                 var sanitizedParameters = SanitizeParameters(parameters);
+                string correlationId = LogService.CreateCorrelationId();
+                var stopwatch = Stopwatch.StartNew();
+                Logger.Info($"Script PowerShell iniciado. Script: {sanitizedScript}", correlationId);
+                if (sanitizedParameters.Count > 0)
+                {
+                    Logger.Debug($"Parâmetros: {string.Join(", ", sanitizedParameters.Select(p => $"{p.Key}={p.Value}"))}", correlationId);
+                }
 
                 lock (ExecutionLock)
                 {
@@ -254,8 +263,16 @@ namespace DirectoryAnalyzer.Services
                             }
                         }
 
+                        stopwatch.Stop();
+                        Logger.Info($"Script PowerShell finalizado em {stopwatch.ElapsedMilliseconds} ms. HadErrors={hadErrors}.", correlationId);
+                        if (errors.Count > 0)
+                        {
+                            Logger.Warn($"Erros PowerShell: {string.Join(" | ", errors)}", correlationId);
+                        }
+
                         if (executionException != null)
                         {
+                            Logger.Error($"Exceção ao executar script PowerShell: {executionException}", correlationId);
                             throw new PowerShellExecutionException(
                                 "Falha ao executar script PowerShell.",
                                 executionException,
@@ -267,6 +284,7 @@ namespace DirectoryAnalyzer.Services
 
                         if (cancellationToken.IsCancellationRequested)
                         {
+                            Logger.Warn("Execução de script PowerShell cancelada.", correlationId);
                             throw new OperationCanceledException(cancellationToken);
                         }
 
