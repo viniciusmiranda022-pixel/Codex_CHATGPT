@@ -14,16 +14,18 @@
 
         <!-- Header -->
         <Border Grid.Row="0" Style="{StaticResource CardStyle}">
-            <DockPanel LastChildFill="False">
-                <StackPanel>
-                    <TextBlock Text="DNS Analyzer" Style="{StaticResource TitleTextStyle}"/>
-                    <TextBlock Text="Coleta zonas, registros e encaminhadores DNS." Style="{StaticResource SubtitleTextStyle}" Margin="0,6,0,0"/>
-                </StackPanel>
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button Content="Executar Coleta" Style="{StaticResource PrimaryButtonStyle}" Command="{Binding RunCommand}"/>
-                    <Button Content="Cancelar" Style="{StaticResource DangerButtonStyle}" Command="{Binding CancelCommand}" Margin="10,0,0,0"/>
-                </StackPanel>
-            </DockPanel>
+            <Grid>
+                <DockPanel LastChildFill="False">
+                    <StackPanel>
+                        <TextBlock Text="DNS Analyzer" Style="{StaticResource TitleTextStyle}"/>
+                        <TextBlock Text="Coleta zonas, registros e encaminhadores DNS." Style="{StaticResource SubtitleTextStyle}" Margin="0,6,0,0"/>
+                    </StackPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="Executar Coleta" Style="{StaticResource PrimaryButtonStyle}" Command="{Binding RunCommand}"/>
+                        <Button Content="Cancelar" Style="{StaticResource DangerButtonStyle}" Command="{Binding CancelCommand}" Margin="10,0,0,0"/>
+                    </StackPanel>
+                </DockPanel>
+            </Grid>
         </Border>
 
         <!-- Feedback de execução -->
