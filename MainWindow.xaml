@@ -27,9 +27,13 @@
                                Style="{StaticResource SubtitleTextStyle}"
                                Margin="0,0,0,18"/>
                     <ListBox x:Name="NavigationMenu"
-                             SelectedIndex="0"
-                             SelectionChanged="NavigationMenu_SelectionChanged">
-                        <ListBoxItem>
+                             SelectedIndex="0">
+                        <ListBoxItem Tag="Dashboard">
+                            <ListBoxItem.InputBindings>
+                                <MouseBinding MouseAction="LeftClick"
+                                              Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                              CommandParameter="Dashboard"/>
+                            </ListBoxItem.InputBindings>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE80F;" Style="{StaticResource NavIconStyle}"
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
@@ -39,28 +43,48 @@
                         <ListBoxItem IsHitTestVisible="False" Focusable="False">
                             <TextBlock Text="INFRAESTRUTURA" Style="{StaticResource NavSectionTextStyle}"/>
                         </ListBoxItem>
-                        <ListBoxItem>
+                        <ListBoxItem Tag="DNS Analyzer">
+                            <ListBoxItem.InputBindings>
+                                <MouseBinding MouseAction="LeftClick"
+                                              Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                              CommandParameter="DNS Analyzer"/>
+                            </ListBoxItem.InputBindings>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE774;" Style="{StaticResource NavIconStyle}"
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
                                 <TextBlock Text="DNS Analyzer" VerticalAlignment="Center"/>
                             </StackPanel>
                         </ListBoxItem>
-                        <ListBoxItem>
+                        <ListBoxItem Tag="SMB Shares Analyzer">
+                            <ListBoxItem.InputBindings>
+                                <MouseBinding MouseAction="LeftClick"
+                                              Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                              CommandParameter="SMB Shares Analyzer"/>
+                            </ListBoxItem.InputBindings>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE8B7;" Style="{StaticResource NavIconStyle}"
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
                                 <TextBlock Text="SMB Shares Analyzer" VerticalAlignment="Center"/>
                             </StackPanel>
                         </ListBoxItem>
-                        <ListBoxItem>
+                        <ListBoxItem Tag="Scheduled Tasks Analyzer">
+                            <ListBoxItem.InputBindings>
+                                <MouseBinding MouseAction="LeftClick"
+                                              Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                              CommandParameter="Scheduled Tasks Analyzer"/>
+                            </ListBoxItem.InputBindings>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE823;" Style="{StaticResource NavIconStyle}"
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
                                 <TextBlock Text="Scheduled Tasks Analyzer" VerticalAlignment="Center"/>
                             </StackPanel>
                         </ListBoxItem>
-                        <ListBoxItem>
+                        <ListBoxItem Tag="IIS AppPools Analyzer">
+                            <ListBoxItem.InputBindings>
+                                <MouseBinding MouseAction="LeftClick"
+                                              Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                              CommandParameter="IIS AppPools Analyzer"/>
+                            </ListBoxItem.InputBindings>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE7F8;" Style="{StaticResource NavIconStyle}"
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
@@ -71,14 +95,24 @@
                         <ListBoxItem IsHitTestVisible="False" Focusable="False">
                             <TextBlock Text="SEGURANÇA" Style="{StaticResource NavSectionTextStyle}"/>
                         </ListBoxItem>
-                        <ListBoxItem>
+                        <ListBoxItem Tag="Local Security Policy Analyzer">
+                            <ListBoxItem.InputBindings>
+                                <MouseBinding MouseAction="LeftClick"
+                                              Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                              CommandParameter="Local Security Policy Analyzer"/>
+                            </ListBoxItem.InputBindings>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE72E;" Style="{StaticResource NavIconStyle}"
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
                                 <TextBlock Text="Local Security Policy Analyzer" VerticalAlignment="Center"/>
                             </StackPanel>
                         </ListBoxItem>
-                        <ListBoxItem>
+                        <ListBoxItem Tag="Trusts Analyzer">
+                            <ListBoxItem.InputBindings>
+                                <MouseBinding MouseAction="LeftClick"
+                                              Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                              CommandParameter="Trusts Analyzer"/>
+                            </ListBoxItem.InputBindings>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE8D7;" Style="{StaticResource NavIconStyle}"
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
@@ -89,21 +123,36 @@
                         <ListBoxItem IsHitTestVisible="False" Focusable="False">
                             <TextBlock Text="IDENTIDADE" Style="{StaticResource NavSectionTextStyle}"/>
                         </ListBoxItem>
-                        <ListBoxItem>
+                        <ListBoxItem Tag="GPO Analyzer">
+                            <ListBoxItem.InputBindings>
+                                <MouseBinding MouseAction="LeftClick"
+                                              Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                              CommandParameter="GPO Analyzer"/>
+                            </ListBoxItem.InputBindings>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE716;" Style="{StaticResource NavIconStyle}"
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
                                 <TextBlock Text="GPO Analyzer" VerticalAlignment="Center"/>
                             </StackPanel>
                         </ListBoxItem>
-                        <ListBoxItem>
+                        <ListBoxItem Tag="Local Profiles Analyzer">
+                            <ListBoxItem.InputBindings>
+                                <MouseBinding MouseAction="LeftClick"
+                                              Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                              CommandParameter="Local Profiles Analyzer"/>
+                            </ListBoxItem.InputBindings>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE77B;" Style="{StaticResource NavIconStyle}"
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
                                 <TextBlock Text="Local Profiles Analyzer" VerticalAlignment="Center"/>
                             </StackPanel>
                         </ListBoxItem>
-                        <ListBoxItem>
+                        <ListBoxItem Tag="Service Account Analyzer">
+                            <ListBoxItem.InputBindings>
+                                <MouseBinding MouseAction="LeftClick"
+                                              Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                              CommandParameter="Service Account Analyzer"/>
+                            </ListBoxItem.InputBindings>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE9D9;" Style="{StaticResource NavIconStyle}"
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
@@ -114,7 +163,12 @@
                         <ListBoxItem IsHitTestVisible="False" Focusable="False">
                             <TextBlock Text="MENSAGERIA" Style="{StaticResource NavSectionTextStyle}"/>
                         </ListBoxItem>
-                        <ListBoxItem>
+                        <ListBoxItem Tag="ProxyAddresses Analyzer">
+                            <ListBoxItem.InputBindings>
+                                <MouseBinding MouseAction="LeftClick"
+                                              Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                              CommandParameter="ProxyAddresses Analyzer"/>
+                            </ListBoxItem.InputBindings>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE715;" Style="{StaticResource NavIconStyle}"
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
@@ -127,7 +181,8 @@
 
             <!-- Conteúdo Principal -->
             <Grid Grid.Column="1" Margin="26">
-                <ContentControl x:Name="ContentArea"/>
+                <ContentControl x:Name="ContentArea"
+                                Content="{Binding CurrentView}"/>
             </Grid>
         </Grid>
 

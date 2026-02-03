@@ -1,54 +1,32 @@
 using System.Windows;
 using System.Windows.Controls;
-using DirectoryAnalyzer.Views;
-// A linha "using MahApps.Metro.Controls;" não é estritamente necessária se removermos a herança explícita.
+using DirectoryAnalyzer.ViewModels;
 
 namespace DirectoryAnalyzer
 {
-    // A única mudança é que removemos o ': Window' do final
     public partial class MainWindow
     {
         public MainWindow()
         {
             InitializeComponent();
+            DataContext = new MainViewModel();
             if (NavigationMenu.Items.Count > 0)
             {
                 NavigationMenu.SelectedIndex = 0;
             }
         }
 
-        private void NavigationMenu_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        public void NavigateTo(string moduleName)
         {
-            if (ContentArea == null || !(NavigationMenu.SelectedItem is ListBoxItem selectedItem))
+            if (DataContext is MainViewModel viewModel)
             {
-                return;
-            }
-            
-            if (selectedItem.Content == null)
-            {
-                return;
+                viewModel.NavigateTo(moduleName);
             }
 
-            string selectedContent = selectedItem.Content.ToString();
-            
-            switch (selectedContent)
-            {
-                case "Dashboard": ContentArea.Content = new DashboardView(); break;
-                case "DNS Analyzer": ContentArea.Content = new DnsAnalyzerView(); break;
-                case "GPO Analyzer": ContentArea.Content = new GpoAnalyzerView(); break;
-                case "SMB Shares Analyzer": ContentArea.Content = new SmbAnalyzerView(); break;
-                case "Scheduled Tasks Analyzer": ContentArea.Content = new ScheduledTasksAnalyzerView(); break;
-                case "Local Profiles Analyzer": ContentArea.Content = new LocalProfilesAnalyzerView(); break;
-                case "Service Account Analyzer": ContentArea.Content = new InstalledServicesAnalyzerView(); break;
-                case "Local Security Policy Analyzer": ContentArea.Content = new LocalSecurityPolicyAnalyzerView(); break;
-                case "IIS AppPools Analyzer": ContentArea.Content = new IisAppPoolsAnalyzerView(); break;
-                case "Trusts Analyzer": ContentArea.Content = new TrustsAnalyzerView(); break;
-                case "ProxyAddresses Analyzer": ContentArea.Content = new ProxyAddressAnalyzerView(); break;
-                default: ContentArea.Content = null; break;
-            }
+            SelectMenuItem(moduleName);
         }
 
-        public void NavigateTo(string moduleName)
+        private void SelectMenuItem(string moduleName)
         {
             if (string.IsNullOrWhiteSpace(moduleName))
             {
@@ -57,7 +35,7 @@ namespace DirectoryAnalyzer
 
             foreach (var item in NavigationMenu.Items)
             {
-                if (item is ListBoxItem listBoxItem && listBoxItem.Content?.ToString() == moduleName)
+                if (item is ListBoxItem listBoxItem && listBoxItem.Tag?.ToString() == moduleName)
                 {
                     NavigationMenu.SelectedItem = listBoxItem;
                     return;
