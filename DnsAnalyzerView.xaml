@@ -2,6 +2,9 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="#f7f7f7">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </UserControl.Resources>
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -25,29 +28,40 @@
         </DockPanel>
 
         <!-- Botão de Execução -->
-        <Button Grid.Row="1"
-                Content="▶ Executar Coleta Completa de DNS"
-                Click="RunFullDnsCollection"
-                Background="#0078D7"
-                Foreground="White"
-                FontWeight="SemiBold"
-                Padding="12,6"
-                BorderThickness="0"
-                Cursor="Hand"
-                HorizontalAlignment="Left"
-                Margin="0,0,0,10"/>
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10">
+            <Button Content="▶ Executar Coleta Completa de DNS"
+                    Command="{Binding RunCommand}"
+                    Background="#0078D7"
+                    Foreground="White"
+                    FontWeight="SemiBold"
+                    Padding="12,6"
+                    BorderThickness="0"
+                    Cursor="Hand"
+                    HorizontalAlignment="Left"/>
+            <Button Content="⏹ Cancelar"
+                    Command="{Binding CancelCommand}"
+                    Background="#ffffff"
+                    BorderBrush="#d9534f"
+                    Foreground="#d9534f"
+                    BorderThickness="1"
+                    FontWeight="SemiBold"
+                    Padding="12,6"
+                    Margin="10,0,0,0"
+                    Cursor="Hand"/>
+        </StackPanel>
 
         <!-- Mensagem de Progresso -->
         <TextBlock x:Name="ProgressText"
                    Grid.Row="2"
-                   Text="⏳ Coletando informações de DNS..."
+                   Text="{Binding ProgressMessage}"
                    FontStyle="Italic"
                    Foreground="#4a90e2"
-                   Visibility="Collapsed"
+                   Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}"
                    Margin="0,0,0,10"/>
 
         <!-- Abas -->
-        <TabControl Grid.Row="3" x:Name="ReportTabs" Background="White" BorderBrush="#ccc" BorderThickness="1">
+        <TabControl Grid.Row="3" x:Name="ReportTabs" Background="White" BorderBrush="#ccc" BorderThickness="1"
+                    SelectedIndex="{Binding SelectedTabIndex}">
             <TabItem Header="Zonas">
                 <DataGrid x:Name="ZonasGrid"
                           AutoGenerateColumns="True"
@@ -57,7 +71,8 @@
                           CanUserAddRows="False"
                           Margin="0"
                           FontSize="13"
-                          IsReadOnly="True"/>
+                          IsReadOnly="True"
+                          ItemsSource="{Binding Zones}"/>
             </TabItem>
 
             <TabItem Header="Registros">
@@ -69,7 +84,8 @@
                           CanUserAddRows="False"
                           Margin="0"
                           FontSize="13"
-                          IsReadOnly="True"/>
+                          IsReadOnly="True"
+                          ItemsSource="{Binding Records}"/>
             </TabItem>
 
             <TabItem Header="Encaminhadores">
@@ -81,22 +97,23 @@
                           CanUserAddRows="False"
                           Margin="0"
                           FontSize="13"
-                          IsReadOnly="True"/>
+                          IsReadOnly="True"
+                          ItemsSource="{Binding Forwarders}"/>
             </TabItem>
         </TabControl>
 
         <!-- Botões de Exportação -->
         <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
-            <Button Content="🗎 Exportar CSV" Margin="5,0" Padding="10,6" Click="ExportCsv_Click"
+            <Button Content="🗎 Exportar CSV" Margin="5,0" Padding="10,6" Command="{Binding ExportCsvCommand}"
                     Background="#ffffff" BorderBrush="#0078D7" Foreground="#0078D7"
                     BorderThickness="1" FontWeight="SemiBold" Cursor="Hand"/>
-            <Button Content="🗐 Exportar XML" Margin="5,0" Padding="10,6" Click="ExportXml_Click"
+            <Button Content="🗐 Exportar XML" Margin="5,0" Padding="10,6" Command="{Binding ExportXmlCommand}"
                     Background="#ffffff" BorderBrush="#0078D7" Foreground="#0078D7"
                     BorderThickness="1" FontWeight="SemiBold" Cursor="Hand"/>
-            <Button Content="🌐 Exportar HTML" Margin="5,0" Padding="10,6" Click="ExportHtml_Click"
+            <Button Content="🌐 Exportar HTML" Margin="5,0" Padding="10,6" Command="{Binding ExportHtmlCommand}"
                     Background="#ffffff" BorderBrush="#0078D7" Foreground="#0078D7"
                     BorderThickness="1" FontWeight="SemiBold" Cursor="Hand"/>
-            <Button Content="🛢 Exportar SQL" Margin="5,0" Padding="10,6" Click="ExportSql_Click"
+            <Button Content="🛢 Exportar SQL" Margin="5,0" Padding="10,6" Command="{Binding ExportSqlCommand}"
                     Background="#ffffff" BorderBrush="#0078D7" Foreground="#0078D7"
                     BorderThickness="1" FontWeight="SemiBold" Cursor="Hand"/>
         </StackPanel>
@@ -104,7 +121,7 @@
         <!-- Status -->
         <Border Grid.Row="5" Background="#e9f1fb" CornerRadius="4" Padding="10" Margin="0,10,0,0">
             <TextBlock x:Name="StatusText"
-                       Text="✔️ Pronto para iniciar a coleta."
+                       Text="{Binding StatusMessage}"
                        FontSize="13"
                        Foreground="#004d99"
                        VerticalAlignment="Center"/>
