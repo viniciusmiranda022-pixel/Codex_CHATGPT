@@ -127,7 +127,11 @@ namespace DirectoryAnalyzer.Services
                         powerShell.AddScript(scriptText);
                         if (parameters != null && parameters.Count > 0)
                         {
-                            powerShell.AddParameters(parameters);
+if (parameters != null && parameters.Count > 0)
+{
+    powerShell.AddParameters(parameters);
+}
+
                         }
 
                         using (cancellationToken.Register(() =>
