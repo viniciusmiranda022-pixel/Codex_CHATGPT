@@ -17,34 +17,43 @@ namespace DirectoryAnalyzer.Views
     public partial class LocalSecurityPolicyAnalyzerView : UserControl
     {
         private readonly PowerShellService _powerShellService;
-        private const string _moduleName = "LocalSecurityPolicyAnalyzer";
+        private const string ModuleName = "LocalSecurityPolicyAnalyzer";
+        private readonly ILogService _logService;
 
         public LocalSecurityPolicyAnalyzerView()
         {
             InitializeComponent();
             _powerShellService = new PowerShellService();
+            _logService = LogService.CreateLogger(ModuleName);
+            UpdateStatus("✔️ Pronto para iniciar a coleta.", "Pronto");
+            SetBusyState(false);
         }
 
         private async void RunPolicyCollection(object sender, RoutedEventArgs e)
         {
             Button button = sender as Button;
             if (button != null) button.IsEnabled = false;
+            string correlationId = LogService.CreateCorrelationId();
+            bool success = false;
+            int? itemCount = null;
+            int? errorCount = null;
 
-            ProgressText.Visibility = Visibility.Visible;
-            StatusText.Text = "⏳ Coletando informações de políticas de segurança. Isso pode demorar...";
+            SetBusyState(true);
+            UpdateStatus("⏳ Coletando informações de políticas de segurança. Isso pode demorar...", "Executando...");
 
             string scopeAttribute = ScopeAttributeBox.Text;
             string scopeValue = ScopeValueBox.Text;
 
             if (string.IsNullOrWhiteSpace(scopeAttribute) || string.IsNullOrWhiteSpace(scopeValue))
             {
-                StatusText.Text = "⚠️ Por favor, preencha o Atributo de Escopo e o Valor do Atributo.";
-                ProgressText.Visibility = Visibility.Collapsed;
+                UpdateStatus("⚠️ Por favor, preencha o Atributo de Escopo e o Valor do Atributo.", "Pronto");
+                SetBusyState(false);
                 if (button != null) button.IsEnabled = true;
                 return;
             }
 
-            LogService.Write(_moduleName, $"Iniciando coleta com critério: {scopeAttribute} = '{scopeValue}'.");
+            _logService.Info($"Iniciando coleta com critério: {scopeAttribute} = '{scopeValue}'.", correlationId);
+            DashboardService.Instance.RecordModuleStart("Local Security Policy Analyzer");
 
             try
             {
@@ -149,19 +158,24 @@ namespace DirectoryAnalyzer.Views
 
                 var errorRows = results.Count(item => (item as IDictionary<string, object>)["PolicyArea"].ToString().Contains("Erro"));
                 var successRows = results.Count - errorRows;
-                StatusText.Text = $"✅ Coleta concluída. {successRows} políticas encontradas com {errorRows} erros de acesso/conexão.";
-                LogService.Write(_moduleName, StatusText.Text);
+                UpdateStatus($"✅ Coleta concluída. {successRows} políticas encontradas com {errorRows} erros de acesso/conexão.", "Concluído");
+                _logService.Info(StatusText.Text, correlationId);
+                success = true;
+                itemCount = results.Count;
+                errorCount = errorRows;
             }
             catch (Exception ex)
             {
-                StatusText.Text = "❌ Erro durante a coleta: " + ex.Message;
-                LogService.Write(_moduleName, "ERRO GERAL NA COLETA: " + ex.ToString());
+                UpdateStatus("❌ Erro durante a coleta: " + ex.Message, "Erro - ver log");
+                _logService.Error("ERRO GERAL NA COLETA: " + ex, correlationId);
+                errorCount = 1;
             }
             finally
             {
-                ProgressText.Visibility = Visibility.Collapsed;
+                SetBusyState(false);
                 if (button != null) button.IsEnabled = true;
-                LogService.Write(_moduleName, "Execução finalizada.");
+                _logService.Info("Execução finalizada.", correlationId);
+                DashboardService.Instance.RecordModuleFinish("Local Security Policy Analyzer", success, itemCount, errorCount);
             }
         }
         
@@ -174,12 +188,14 @@ namespace DirectoryAnalyzer.Views
 
         private void ExportCsv_Click(object sender, RoutedEventArgs e)
         {
-            if (!(PolicyGrid.ItemsSource is IEnumerable<dynamic> data) || !data.Any()) { StatusText.Text = "⚠️ Não há dados para exportar."; return; }
+            string correlationId = LogService.CreateCorrelationId();
+            if (!(PolicyGrid.ItemsSource is IEnumerable<dynamic> data) || !data.Any()) { UpdateStatus("⚠️ Não há dados para exportar.", "Pronto"); return; }
             var saveDialog = new SaveFileDialog { FileName = $"LocalSecurityPolicy_{DateTime.Now:yyyyMMdd_HHmmss}.csv", Filter = "CSV Files (*.csv)|*.csv" };
             if (saveDialog.ShowDialog() == true)
             {
                 try
                 {
+                    _logService.Info($"Iniciando exportação CSV: {saveDialog.FileName}", correlationId);
                     var sb = new StringBuilder();
                     if (data.FirstOrDefault() is IDictionary<string, object> firstItem) sb.AppendLine(string.Join(";", firstItem.Keys));
                     foreach (var item in data)
@@ -191,20 +207,23 @@ namespace DirectoryAnalyzer.Views
                         }
                     }
                     File.WriteAllText(saveDialog.FileName, sb.ToString(), Encoding.UTF8);
-                    StatusText.Text = $"✅ Exportação CSV concluída: {saveDialog.FileName}";
+                    UpdateStatus($"✅ Exportação CSV concluída: {saveDialog.FileName}", "Concluído");
+                    _logService.Info("Exportação CSV concluída.", correlationId);
                 }
-                catch (Exception ex) { StatusText.Text = "❌ Erro ao exportar para CSV: " + ex.Message; }
+                catch (Exception ex) { UpdateStatus("❌ Erro ao exportar para CSV: " + ex.Message, "Erro - ver log"); _logService.Error("Erro ao exportar para CSV: " + ex, correlationId); }
             }
         }
 
         private void ExportXml_Click(object sender, RoutedEventArgs e)
         {
-            if (!(PolicyGrid.ItemsSource is IEnumerable<dynamic> data) || !data.Any()) { StatusText.Text = "⚠️ Não há dados para exportar."; return; }
+            string correlationId = LogService.CreateCorrelationId();
+            if (!(PolicyGrid.ItemsSource is IEnumerable<dynamic> data) || !data.Any()) { UpdateStatus("⚠️ Não há dados para exportar.", "Pronto"); return; }
             var saveDialog = new SaveFileDialog { FileName = $"LocalSecurityPolicy_{DateTime.Now:yyyyMMdd_HHmmss}.xml", Filter = "XML Files (*.xml)|*.xml" };
             if (saveDialog.ShowDialog() == true)
             {
                 try
                 {
+                    _logService.Info($"Iniciando exportação XML: {saveDialog.FileName}", correlationId);
                     using (var writer = new XmlTextWriter(saveDialog.FileName, Encoding.UTF8))
                     {
                         writer.Formatting = Formatting.Indented;
@@ -220,20 +239,23 @@ namespace DirectoryAnalyzer.Views
                         }
                         writer.WriteEndElement(); writer.WriteEndDocument();
                     }
-                    StatusText.Text = $"✅ Exportação XML concluída: {saveDialog.FileName}";
+                    UpdateStatus($"✅ Exportação XML concluída: {saveDialog.FileName}", "Concluído");
+                    _logService.Info("Exportação XML concluída.", correlationId);
                 }
-                catch (Exception ex) { StatusText.Text = "❌ Erro ao exportar para XML: " + ex.Message; }
+                catch (Exception ex) { UpdateStatus("❌ Erro ao exportar para XML: " + ex.Message, "Erro - ver log"); _logService.Error("Erro ao exportar para XML: " + ex, correlationId); }
             }
         }
 
         private void ExportHtml_Click(object sender, RoutedEventArgs e)
         {
-            if (!(PolicyGrid.ItemsSource is IEnumerable<dynamic> data) || !data.Any()) { StatusText.Text = "⚠️ Não há dados para exportar."; return; }
+            string correlationId = LogService.CreateCorrelationId();
+            if (!(PolicyGrid.ItemsSource is IEnumerable<dynamic> data) || !data.Any()) { UpdateStatus("⚠️ Não há dados para exportar.", "Pronto"); return; }
             var saveDialog = new SaveFileDialog { FileName = $"LocalSecurityPolicy_{DateTime.Now:yyyyMMdd_HHmmss}.html", Filter = "HTML Files (*.html)|*.html" };
             if (saveDialog.ShowDialog() == true)
             {
                 try
                 {
+                    _logService.Info($"Iniciando exportação HTML: {saveDialog.FileName}", correlationId);
                     var sb = new StringBuilder();
                     sb.AppendLine("<html><head><title>Relatório de Política de Segurança Local</title><style>body{font-family:sans-serif}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;padding:8px}tr:nth-child(even){background-color:#f2f2f2}</style></head><body>");
                     sb.AppendLine("<h2>Relatório de Política de Segurança Local</h2><table>");
@@ -250,15 +272,17 @@ namespace DirectoryAnalyzer.Views
                     }
                     sb.AppendLine("</table></body></html>");
                     File.WriteAllText(saveDialog.FileName, sb.ToString(), Encoding.UTF8);
-                    StatusText.Text = $"✅ Exportação HTML concluída: {saveDialog.FileName}";
+                    UpdateStatus($"✅ Exportação HTML concluída: {saveDialog.FileName}", "Concluído");
+                    _logService.Info("Exportação HTML concluída.", correlationId);
                 }
-                catch (Exception ex) { StatusText.Text = "❌ Erro ao exportar para HTML: " + ex.Message; }
+                catch (Exception ex) { UpdateStatus("❌ Erro ao exportar para HTML: " + ex.Message, "Erro - ver log"); _logService.Error("Erro ao exportar para HTML: " + ex, correlationId); }
             }
         }
 
         private void ExportSql_Click(object sender, RoutedEventArgs e)
         {
-            if (!(PolicyGrid.ItemsSource is IEnumerable<dynamic> data) || !data.Any()) { StatusText.Text = "⚠️ Não há dados para exportar."; return; }
+            string correlationId = LogService.CreateCorrelationId();
+            if (!(PolicyGrid.ItemsSource is IEnumerable<dynamic> data) || !data.Any()) { UpdateStatus("⚠️ Não há dados para exportar.", "Pronto"); return; }
             try
             {
                 var dialog = new SqlConnectionDialog();
@@ -270,18 +294,35 @@ namespace DirectoryAnalyzer.Views
                     sqlManager.EnsureDatabaseExists();
                     
                     string tableName = $"LocalSecurityPolicy_{DateTime.Now:yyyyMMdd_HHmmss}";
-                    LogService.Write(_moduleName, $"Iniciando exportação SQL para tabela '{tableName}'.");
+                    _logService.Info($"Iniciando exportação SQL para tabela '{tableName}'.", correlationId);
                     ExportService.ExportToSql(data, tableName, dialog.ConnectionString);
 
-                    StatusText.Text = $"✅ Exportação SQL concluída com sucesso.\nBanco: {dialog.DatabaseName}";
-                    LogService.Write(_moduleName, $"Exportação SQL para a tabela '{tableName}' concluída com sucesso.");
+                    UpdateStatus($"✅ Exportação SQL concluída com sucesso.\nBanco: {dialog.DatabaseName}", "Concluído");
+                    _logService.Info($"Exportação SQL para a tabela '{tableName}' concluída com sucesso.", correlationId);
                 }
             }
             catch (Exception ex) 
             {
-                StatusText.Text = "❌ Erro ao exportar para SQL: " + ex.Message;
-                LogService.Write(_moduleName, "ERRO na exportação para SQL: " + ex.ToString());
+                UpdateStatus("❌ Erro ao exportar para SQL: " + ex.Message, "Erro - ver log");
+                _logService.Error("ERRO na exportação para SQL: " + ex, correlationId);
             }
+        }
+
+        private void UpdateStatus(string message, string globalStatus)
+        {
+            StatusText.Text = message;
+            StatusService.Instance.SetStatus(globalStatus);
+        }
+
+        private void SetBusyState(bool isBusy)
+        {
+            ProgressBar.Visibility = isBusy ? Visibility.Visible : Visibility.Collapsed;
+            ProgressText.Visibility = isBusy ? Visibility.Visible : Visibility.Collapsed;
+            ExecuteButton.IsEnabled = !isBusy;
+            ExportCsvButton.IsEnabled = !isBusy;
+            ExportXmlButton.IsEnabled = !isBusy;
+            ExportHtmlButton.IsEnabled = !isBusy;
+            ExportSqlButton.IsEnabled = !isBusy;
         }
     }
 }

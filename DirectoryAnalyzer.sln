@@ -5,6 +5,8 @@ VisualStudioVersion = 17.14.36202.13 d17.14
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryAnalyzer", "DirectoryAnalyzer.csproj", "{2C8FA93A-BAC2-0980-1BA7-140D78983607}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryAnalyzer.SmokeTests", "DirectoryAnalyzer.SmokeTests\\DirectoryAnalyzer.SmokeTests.csproj", "{D17DCC8F-902F-4DDA-8F2C-2F4BCFAA15A9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{2C8FA93A-BAC2-0980-1BA7-140D78983607}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2C8FA93A-BAC2-0980-1BA7-140D78983607}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2C8FA93A-BAC2-0980-1BA7-140D78983607}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D17DCC8F-902F-4DDA-8F2C-2F4BCFAA15A9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D17DCC8F-902F-4DDA-8F2C-2F4BCFAA15A9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D17DCC8F-902F-4DDA-8F2C-2F4BCFAA15A9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D17DCC8F-902F-4DDA-8F2C-2F4BCFAA15A9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

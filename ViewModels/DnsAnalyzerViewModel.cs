@@ -33,7 +33,7 @@ namespace DirectoryAnalyzer.ViewModels
             ExportHtmlCommand = new AsyncRelayCommand(() => ExportAsync(ExportFormat.Html), () => !IsBusy);
             ExportSqlCommand = new AsyncRelayCommand(() => ExportAsync(ExportFormat.Sql), () => !IsBusy);
 
-            StatusMessage = "✔️ Pronto para iniciar a coleta.";
+            SetStatus("✔️ Pronto para iniciar a coleta.", "Pronto");
         }
 
         public ObservableCollection<DnsZoneResult> Zones { get; } = new ObservableCollection<DnsZoneResult>();
@@ -58,11 +58,18 @@ namespace DirectoryAnalyzer.ViewModels
             _cancellationTokenSource?.Dispose();
             _cancellationTokenSource = new CancellationTokenSource();
             var progress = new Progress<string>(message => ProgressMessage = message);
+            string correlationId = LogService.CreateCorrelationId();
+            bool wasCanceled = false;
+            bool success = false;
+            int? itemCount = null;
+            int? errorCount = null;
 
             IsBusy = true;
             UpdateCommandStates();
             ProgressMessage = "⏳ Coletando informações de DNS...";
-            StatusMessage = "⏳ Coletando informações de DNS...";
+            SetStatus("⏳ Coletando informações de DNS...", "Executando...");
+            _logService.Info("Iniciando coleta de DNS.", correlationId);
+            DashboardService.Instance.RecordModuleStart("DNS Analyzer");
 
             try
             {
@@ -87,23 +94,30 @@ namespace DirectoryAnalyzer.ViewModels
                     Forwarders.Add(forwarder);
                 }
 
-                StatusMessage = $"✅ Coleta finalizada. {Zones.Count} zonas, {Records.Count} registros, {Forwarders.Count} encaminhadores.";
+                SetStatus($"✅ Coleta finalizada. {Zones.Count} zonas, {Records.Count} registros, {Forwarders.Count} encaminhadores.", "Concluído");
+                _logService.Info("Coleta de DNS concluída.", correlationId);
+                success = true;
+                itemCount = Zones.Count + Records.Count + Forwarders.Count;
+                errorCount = 0;
             }
             catch (OperationCanceledException)
             {
-                StatusMessage = "⚠️ Coleta cancelada pelo usuário.";
-                _logService.Warn("Coleta cancelada pelo usuário.");
+                SetStatus("⚠️ Coleta cancelada pelo usuário.", "Pronto");
+                _logService.Warn("Coleta cancelada pelo usuário.", correlationId);
+                wasCanceled = true;
             }
             catch (Exception ex)
             {
-                StatusMessage = "❌ Erro durante a coleta: " + ex.Message;
-                _logService.Error("ERRO na coleta de DNS: " + ex);
+                SetStatus("❌ Erro durante a coleta: " + ex.Message, "Erro - ver log");
+                _logService.Error("ERRO na coleta de DNS: " + ex, correlationId);
+                errorCount = 1;
             }
             finally
             {
                 ProgressMessage = string.Empty;
                 IsBusy = false;
                 UpdateCommandStates();
+                DashboardService.Instance.RecordModuleFinish("DNS Analyzer", success, itemCount, errorCount, wasCanceled);
             }
         }
 
@@ -112,13 +126,16 @@ namespace DirectoryAnalyzer.ViewModels
             var data = GetSelectedData();
             if (data == null || data.Count == 0)
             {
-                StatusMessage = "⚠️ Nenhum dado para exportar.";
+                SetStatus("⚠️ Nenhum dado para exportar.", "Pronto");
                 return;
             }
 
             IsBusy = true;
             UpdateCommandStates();
             ProgressMessage = "⏳ Exportando dados...";
+            SetStatus("⏳ Exportando dados...", "Executando...");
+            string correlationId = LogService.CreateCorrelationId();
+            _logService.Info($"Iniciando exportação {format}.", correlationId);
 
             try
             {
@@ -141,15 +158,15 @@ namespace DirectoryAnalyzer.ViewModels
                         }
 
                         await Task.Run(() => ExecuteExport(format, data, dialog.FileName));
-                        StatusMessage = $"✅ Exportação {format} concluída: {dialog.FileName}";
-                        _logService.Info($"Exportação {format} concluída: {dialog.FileName}");
+                        SetStatus($"✅ Exportação {format} concluída: {dialog.FileName}", "Concluído");
+                        _logService.Info($"Exportação {format} concluída: {dialog.FileName}", correlationId);
                         break;
                 }
             }
             catch (Exception ex)
             {
-                StatusMessage = $"❌ Erro ao exportar {format}: {ex.Message}";
-                _logService.Error($"ERRO na exportação {format}: {ex}");
+                SetStatus($"❌ Erro ao exportar {format}: {ex.Message}", "Erro - ver log");
+                _logService.Error($"ERRO na exportação {format}: {ex}", correlationId);
             }
             finally
             {
@@ -185,10 +202,11 @@ namespace DirectoryAnalyzer.ViewModels
             }
 
             string tableName = $"DNS_{GetCurrentTabName()}_{DateTime.Now:yyyyMMdd_HHmmss}";
-            _logService.Info($"Iniciando exportação SQL. Tabela: '{tableName}', Banco: '{dialog.DatabaseName}'.");
+            string correlationId = LogService.CreateCorrelationId();
+            _logService.Info($"Iniciando exportação SQL. Tabela: '{tableName}', Banco: '{dialog.DatabaseName}'.", correlationId);
             await Task.Run(() => ExportService.ExportToSql(data, tableName, dialog.ConnectionString));
-            StatusMessage = $"✅ Exportação SQL concluída: {dialog.DatabaseName}";
-            _logService.Info($"Exportação SQL concluída: {dialog.DatabaseName}");
+            SetStatus($"✅ Exportação SQL concluída: {dialog.DatabaseName}", "Concluído");
+            _logService.Info($"Exportação SQL concluída: {dialog.DatabaseName}", correlationId);
         }
 
         private void CancelCollection()

@@ -5,96 +5,82 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              mc:Ignorable="d" 
              d:DesignHeight="500" d:DesignWidth="800"
-             Background="#f7f7f7">
+             Background="{StaticResource BackgroundBrush}">
 
-    <Grid Margin="20">
+    <Grid Margin="0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <DockPanel Grid.Row="0" Margin="0,0,0,10">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="👤" FontSize="20" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                <TextBlock Text="Directory Analyzer - Local Profiles"
-                           FontSize="20"
-                           FontWeight="Bold"
-                           Foreground="#111111"
-                           VerticalAlignment="Center"/>
+        <!-- Header -->
+        <Border Grid.Row="0" Style="{StaticResource CardStyle}">
+            <DockPanel LastChildFill="False">
+                <StackPanel>
+                    <TextBlock Text="Local Profiles Analyzer" Style="{StaticResource TitleTextStyle}"/>
+                    <TextBlock Text="Inventário de perfis locais por escopo." Style="{StaticResource SubtitleTextStyle}" Margin="0,6,0,0"/>
+                </StackPanel>
+                <Button x:Name="ExecuteButton"
+                        DockPanel.Dock="Right"
+                        Content="Executar Coleta"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        Click="RunProfileCollection"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Filtros -->
+        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Margin="0,16,0,0">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <StackPanel Margin="0,0,16,0">
+                        <TextBlock Text="Atributo de Escopo" Style="{StaticResource CaptionTextStyle}"/>
+                        <TextBox x:Name="ScopeAttributeBox" Width="220" Tag="ex: Department"/>
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="Valor do Atributo" Style="{StaticResource CaptionTextStyle}"/>
+                        <TextBox x:Name="ScopeValueBox" Width="240" Tag="ex: TI"/>
+                    </StackPanel>
+                </StackPanel>
+                <TextBlock Text="Dica: selecione servidores por atributo para limitar a coleta." Style="{StaticResource CaptionTextStyle}" Margin="0,10,0,0"/>
             </StackPanel>
-        </DockPanel>
+        </Border>
 
-        <GroupBox Grid.Row="1" Header="Configuração de Escopo (Busca de Computadores no AD)" Margin="0,0,0,10">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="Atributo de Escopo:" VerticalAlignment="Center" Margin="5"/>
-                <TextBox Grid.Column="1" x:Name="ScopeAttributeBox" Text="description" Margin="5"/>
-                <TextBlock Grid.Column="2" Text="Valor do Atributo:" VerticalAlignment="Center" Margin="5"/>
-                <TextBox Grid.Column="3" x:Name="ScopeValueBox" Text="migrar" Margin="5"/>
-            </Grid>
-        </GroupBox>
-
-        <Button Grid.Row="2"
-                Content="▶ Executar Coleta de Perfis Locais"
-                Click="RunProfileCollection"
-                Background="#0078D7"
-                Foreground="White"
-                FontWeight="SemiBold"
-                Padding="12,6"
-                BorderThickness="0"
-                Cursor="Hand"
-                HorizontalAlignment="Left"
-                Margin="0,0,0,10"/>
-
-        <TextBlock x:Name="ProgressText"
-                   Grid.Row="3"
-                   Text="⏳ Coletando informações de perfis locais..."
-                   FontStyle="Italic"
-                   Foreground="#4a90e2"
-                   Visibility="Collapsed"
-                   Margin="0,0,0,10"/>
-
-        <DataGrid x:Name="ProfilesGrid"
-                  Grid.Row="4"
-                  IsReadOnly="True"
-                  AutoGenerateColumns="False"
-                  CanUserAddRows="False"
-                  HeadersVisibility="Column"
-                  FontSize="13"
-                  RowBackground="#ffffff"
-                  AlternatingRowBackground="#f0f0f0">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Computador" Binding="{Binding ComputerName}" Width="*"/>
-                <DataGridTextColumn Header="Nome da Conta" Binding="{Binding AccountName}" Width="2*"/>
-                <DataGridTextColumn Header="Caminho Local" Binding="{Binding LocalPath}" Width="3*"/>
-                <DataGridTextColumn Header="Último Uso" Binding="{Binding LastUseTime, StringFormat='dd/MM/yyyy HH:mm'}" Width="*"/>
-                <DataGridTextColumn Header="SID" Binding="{Binding SID}" Width="3*"/>
-            </DataGrid.Columns>
-        </DataGrid>
-
-        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
-            <Button Content="🗎 Exportar CSV" Margin="5,0" Padding="10,6" Click="ExportCsv_Click" Background="#ffffff" BorderBrush="#0078D7" Foreground="#0078D7" BorderThickness="1" FontWeight="SemiBold" Cursor="Hand"/>
-            <Button Content="🗐 Exportar XML" Margin="5,0" Padding="10,6" Click="ExportXml_Click" Background="#ffffff" BorderBrush="#0078D7" Foreground="#0078D7" BorderThickness="1" FontWeight="SemiBold" Cursor="Hand"/>
-            <Button Content="🌐 Exportar HTML" Margin="5,0" Padding="10,6" Click="ExportHtml_Click" Background="#ffffff" BorderBrush="#0078D7" Foreground="#0078D7" BorderThickness="1" FontWeight="SemiBold" Cursor="Hand"/>
-            <Button Content="🛢 Exportar SQL" Margin="5,0" Padding="10,6" Click="ExportSql_Click" Background="#ffffff" BorderBrush="#0078D7" Foreground="#0078D7" BorderThickness="1" FontWeight="SemiBold" Cursor="Hand"/>
+        <!-- Feedback de execução -->
+        <StackPanel Grid.Row="2" Margin="2,10,0,0">
+            <ProgressBar x:Name="ProgressBar"
+                         IsIndeterminate="True"
+                         Style="{StaticResource InlineProgressBarStyle}"
+                         Visibility="Collapsed"/>
+            <TextBlock x:Name="ProgressText"
+                       Text="⏳ Coletando informações de perfis locais..."
+                       Style="{StaticResource CaptionTextStyle}"
+                       Foreground="{StaticResource PrimaryBrush}"
+                       Visibility="Collapsed"
+                       Margin="0,8,0,0"/>
         </StackPanel>
 
-        <Border Grid.Row="6" Background="#e9f1fb" CornerRadius="4" Padding="10" Margin="0,10,0,0">
-            <TextBlock x:Name="StatusText"
-                       Text="✔️ Pronto para iniciar a coleta."
-                       FontSize="13"
-                       Foreground="#004d99"
-                       VerticalAlignment="Center"/>
+        <!-- Resultados -->
+        <Border Grid.Row="3" Style="{StaticResource CardStyle}" Margin="0,16,0,0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <DataGrid x:Name="ProfilesGrid" AutoGenerateColumns="True"/>
+
+                <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+                    <Button x:Name="ExportCsvButton" Content="Exportar CSV" Style="{StaticResource OutlineButtonStyle}" Click="ExportCsv_Click" ToolTip="Exporta a lista atual em CSV."/>
+                    <Button x:Name="ExportXmlButton" Content="Exportar XML" Style="{StaticResource OutlineButtonStyle}" Click="ExportXml_Click" Margin="10,0,0,0" ToolTip="Exporta a lista atual em XML."/>
+                    <Button x:Name="ExportHtmlButton" Content="Exportar HTML" Style="{StaticResource OutlineButtonStyle}" Click="ExportHtml_Click" Margin="10,0,0,0" ToolTip="Exporta a lista atual em HTML."/>
+                    <Button x:Name="ExportSqlButton" Content="Exportar SQL" Style="{StaticResource OutlineButtonStyle}" Click="ExportSql_Click" Margin="10,0,0,0" ToolTip="Exporta a lista atual para SQL."/>
+                </StackPanel>
+
+                <TextBlock Grid.Row="2" x:Name="StatusText" Text="✔️ Pronto para iniciar a coleta." Style="{StaticResource CaptionTextStyle}" Margin="0,12,0,0"/>
+            </Grid>
         </Border>
     </Grid>
 </UserControl>

@@ -24,10 +24,16 @@ namespace DirectoryAnalyzer
                 return;
             }
             
+            if (selectedItem.Content == null)
+            {
+                return;
+            }
+
             string selectedContent = selectedItem.Content.ToString();
             
             switch (selectedContent)
             {
+                case "Dashboard": ContentArea.Content = new DashboardView(); break;
                 case "DNS Analyzer": ContentArea.Content = new DnsAnalyzerView(); break;
                 case "GPO Analyzer": ContentArea.Content = new GpoAnalyzerView(); break;
                 case "SMB Shares Analyzer": ContentArea.Content = new SmbAnalyzerView(); break;
@@ -39,6 +45,23 @@ namespace DirectoryAnalyzer
                 case "Trusts Analyzer": ContentArea.Content = new TrustsAnalyzerView(); break;
                 case "ProxyAddresses Analyzer": ContentArea.Content = new ProxyAddressAnalyzerView(); break;
                 default: ContentArea.Content = null; break;
+            }
+        }
+
+        public void NavigateTo(string moduleName)
+        {
+            if (string.IsNullOrWhiteSpace(moduleName))
+            {
+                return;
+            }
+
+            foreach (var item in NavigationMenu.Items)
+            {
+                if (item is ListBoxItem listBoxItem && listBoxItem.Content?.ToString() == moduleName)
+                {
+                    NavigationMenu.SelectedItem = listBoxItem;
+                    return;
+                }
             }
         }
     }

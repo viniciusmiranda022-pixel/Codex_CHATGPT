@@ -1,0 +1,115 @@
+<UserControl x:Class="DirectoryAnalyzer.Views.DashboardView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="600" d:DesignWidth="900"
+             Background="{StaticResource BackgroundBrush}">
+    <Grid Margin="0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Style="{StaticResource CardStyle}">
+            <StackPanel>
+                <TextBlock Text="Dashboard" Style="{StaticResource TitleTextStyle}"/>
+                <TextBlock Text="Visão geral das últimas execuções e atalhos para os módulos principais."
+                           Style="{StaticResource SubtitleTextStyle}" Margin="0,6,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" Margin="0,16,0,0" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <ItemsControl ItemsSource="{Binding KpiCards}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="{Binding KpiColumns}"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource CardStyle}" Margin="0,0,16,16">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Title}" Style="{StaticResource CaptionTextStyle}"/>
+                                        <TextBlock Text="{Binding Value}" FontSize="24" FontWeight="SemiBold" Margin="0,6,0,0" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                        <TextBlock Text="{Binding Subtext}" Style="{StaticResource CaptionTextStyle}" Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="{Binding Icon}" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="{StaticResource TextSecondaryBrush}" Margin="16,0,0,0"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <WrapPanel Margin="0,0,0,16" ItemWidth="420" ItemHeight="Auto">
+                    <Border Style="{StaticResource CardStyle}" Margin="0,0,16,16" Width="420">
+                        <StackPanel>
+                            <TextBlock Text="Atalhos" Style="{StaticResource SectionHeaderTextStyle}"/>
+                            <TextBlock Text="Acesse rapidamente os módulos mais usados." Style="{StaticResource SubtitleTextStyle}" Margin="0,6,0,0"/>
+                            <ItemsControl ItemsSource="{Binding QuickActions}" Margin="0,12,0,0">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Columns="2"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding Target}"
+                                                Style="{StaticResource OutlineButtonStyle}"
+                                                Margin="0,0,12,12"
+                                                Padding="12">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                                                <TextBlock Text="{Binding Description}" Style="{StaticResource CaptionTextStyle}" Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource CardStyle}" Margin="0,0,16,16" Width="420">
+                        <StackPanel>
+                            <TextBlock Text="Atividade recente" Style="{StaticResource SectionHeaderTextStyle}"/>
+                            <TextBlock Text="Últimas execuções registradas no ambiente." Style="{StaticResource SubtitleTextStyle}" Margin="0,6,0,0"/>
+                            <ListView ItemsSource="{Binding RecentActivities}" Margin="0,12,0,0" BorderThickness="0">
+                                <ListView.View>
+                                    <GridView>
+                                        <GridViewColumn Header="Horário" DisplayMemberBinding="{Binding Timestamp}" Width="120"/>
+                                        <GridViewColumn Header="Módulo" DisplayMemberBinding="{Binding Module}" Width="160"/>
+                                        <GridViewColumn Header="Status" DisplayMemberBinding="{Binding Status}" Width="100"/>
+                                        <GridViewColumn Header="Duração" DisplayMemberBinding="{Binding Duration}" Width="90"/>
+                                    </GridView>
+                                </ListView.View>
+                            </ListView>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource CardStyle}" Margin="0,0,16,16" Width="420">
+                        <StackPanel>
+                            <TextBlock Text="Saúde do sistema" Style="{StaticResource SectionHeaderTextStyle}"/>
+                            <TextBlock Text="Indicadores gerais do aplicativo." Style="{StaticResource SubtitleTextStyle}" Margin="0,6,0,0"/>
+                            <StackPanel Margin="0,12,0,0">
+                                <TextBlock Text="Log atual" Style="{StaticResource CaptionTextStyle}"/>
+                                <TextBlock Text="{Binding LogFilePath}" TextWrapping="Wrap" Margin="0,4,0,12"/>
+                                <TextBlock Text="Versão do app" Style="{StaticResource CaptionTextStyle}"/>
+                                <TextBlock Text="{Binding AppVersion}" Margin="0,4,0,12"/>
+                                <TextBlock Text="StatusService" Style="{StaticResource CaptionTextStyle}"/>
+                                <TextBlock Text="{Binding StatusServiceState}" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </WrapPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

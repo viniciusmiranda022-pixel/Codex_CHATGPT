@@ -5,79 +5,77 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              mc:Ignorable="d" 
              d:DesignHeight="500" d:DesignWidth="800"
-             Background="#f7f7f7">
+             Background="{StaticResource BackgroundBrush}">
 
-    <Grid Margin="20">
+    <Grid Margin="0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <DockPanel Grid.Row="0" Margin="0,0,0,10">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="📜" FontSize="20" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                <TextBlock Text="Directory Analyzer - GPO"
-                           FontSize="20"
-                           FontWeight="Bold"
-                           Foreground="#111111"
-                           VerticalAlignment="Center"/>
-            </StackPanel>
-        </DockPanel>
+        <Border Grid.Row="0" Style="{StaticResource CardStyle}">
+            <DockPanel LastChildFill="False">
+                <StackPanel>
+                    <TextBlock Text="GPO Analyzer" Style="{StaticResource TitleTextStyle}"/>
+                    <TextBlock Text="Inventário de políticas, vínculos e delegações." Style="{StaticResource SubtitleTextStyle}" Margin="0,6,0,0"/>
+                </StackPanel>
+                <Button x:Name="ExecuteButton"
+                        DockPanel.Dock="Right"
+                        Content="Executar Coleta"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        Click="RunFullGpoCollection"/>
+            </DockPanel>
+        </Border>
 
-        <Button Grid.Row="1"
-                Content="▶ Executar Coleta Completa de GPOs"
-                Click="RunFullGpoCollection"
-                Background="#0078D7"
-                Foreground="White"
-                FontWeight="SemiBold"
-                Padding="12,6"
-                BorderThickness="0"
-                Cursor="Hand"
-                HorizontalAlignment="Left"
-                Margin="0,0,0,10"/>
-
-        <TextBlock x:Name="ProgressText"
-                   Grid.Row="2"
-                   Text="⏳ Coletando informações de GPOs..."
-                   FontStyle="Italic"
-                   Foreground="#4a90e2"
-                   Visibility="Collapsed"
-                   Margin="0,0,0,10"/>
-
-        <TabControl Grid.Row="3" x:Name="ReportTabs" Background="White" BorderBrush="#ccc" BorderThickness="1">
-            <TabItem Header="Resumo">
-                <DataGrid x:Name="ResumoGrid" AutoGenerateColumns="True" IsReadOnly="True" FontSize="13" Margin="0" CanUserAddRows="False" HeadersVisibility="Column" RowBackground="#ffffff" AlternatingRowBackground="#f0f0f0"/>
-            </TabItem>
-            <TabItem Header="Vínculos (Links)">
-                <DataGrid x:Name="LinksGrid" AutoGenerateColumns="True" IsReadOnly="True" FontSize="13" Margin="0" CanUserAddRows="False" HeadersVisibility="Column" RowBackground="#ffffff" AlternatingRowBackground="#f0f0f0"/>
-            </TabItem>
-            <TabItem Header="Delegação">
-                <DataGrid x:Name="DelegacaoGrid" AutoGenerateColumns="True" IsReadOnly="True" FontSize="13" Margin="0" CanUserAddRows="False" HeadersVisibility="Column" RowBackground="#ffffff" AlternatingRowBackground="#f0f0f0"/>
-            </TabItem> <TabItem Header="Filtros de Segurança">
-                <DataGrid x:Name="SecurityFilteringGrid" AutoGenerateColumns="True" IsReadOnly="True" FontSize="13" Margin="0" CanUserAddRows="False" HeadersVisibility="Column" RowBackground="#ffffff" AlternatingRowBackground="#f0f0f0"/>
-            </TabItem>
-            <TabItem Header="Filtros WMI">
-                <DataGrid x:Name="WmiFiltersGrid" AutoGenerateColumns="True" IsReadOnly="True" FontSize="13" Margin="0" CanUserAddRows="False" HeadersVisibility="Column" RowBackground="#ffffff" AlternatingRowBackground="#f0f0f0"/>
-            </TabItem>
-        </TabControl>
-
-        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
-            <Button Content="🗎 Exportar CSV" Margin="5,0" Padding="10,6" Click="ExportCsv_Click" Background="#ffffff" BorderBrush="#0078D7" Foreground="#0078D7" BorderThickness="1" FontWeight="SemiBold" Cursor="Hand"/>
-            <Button Content="🗐 Exportar XML" Margin="5,0" Padding="10,6" Click="ExportXml_Click" Background="#ffffff" BorderBrush="#0078D7" Foreground="#0078D7" BorderThickness="1" FontWeight="SemiBold" Cursor="Hand"/>
-            <Button Content="🌐 Exportar HTML" Margin="5,0" Padding="10,6" Click="ExportHtml_Click" Background="#ffffff" BorderBrush="#0078D7" Foreground="#0078D7" BorderThickness="1" FontWeight="SemiBold" Cursor="Hand"/>
-            <Button Content="🛢 Exportar SQL" Margin="5,0" Padding="10,6" Click="ExportSql_Click" Background="#ffffff" BorderBrush="#0078D7" Foreground="#0078D7" BorderThickness="1" FontWeight="SemiBold" Cursor="Hand"/>
+        <StackPanel Grid.Row="1" Margin="2,10,0,0">
+            <ProgressBar x:Name="ProgressBar"
+                         IsIndeterminate="True"
+                         Style="{StaticResource InlineProgressBarStyle}"
+                         Visibility="Collapsed"/>
+            <TextBlock x:Name="ProgressText"
+                       Text="⏳ Coletando informações de GPOs..."
+                       Style="{StaticResource CaptionTextStyle}"
+                       Foreground="{StaticResource PrimaryBrush}"
+                       Visibility="Collapsed"
+                       Margin="0,8,0,0"/>
         </StackPanel>
 
-        <Border Grid.Row="5" Background="#e9f1fb" CornerRadius="4" Padding="10" Margin="0,10,0,0">
-            <TextBlock x:Name="StatusText"
-                       Text="✔️ Pronto para iniciar a coleta."
-                       FontSize="13"
-                       Foreground="#004d99"
-                       VerticalAlignment="Center"/>
+        <Border Grid.Row="2" Style="{StaticResource CardStyle}" Margin="0,16,0,0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TabControl x:Name="ReportTabs">
+                    <TabItem Header="Resumo">
+                        <DataGrid x:Name="ResumoGrid" AutoGenerateColumns="True"/>
+                    </TabItem>
+                    <TabItem Header="Vínculos (Links)">
+                        <DataGrid x:Name="LinksGrid" AutoGenerateColumns="True"/>
+                    </TabItem>
+                    <TabItem Header="Delegação">
+                        <DataGrid x:Name="DelegacaoGrid" AutoGenerateColumns="True"/>
+                    </TabItem>
+                    <TabItem Header="Filtros de Segurança">
+                        <DataGrid x:Name="SecurityFilteringGrid" AutoGenerateColumns="True"/>
+                    </TabItem>
+                    <TabItem Header="Filtros WMI">
+                        <DataGrid x:Name="WmiFiltersGrid" AutoGenerateColumns="True"/>
+                    </TabItem>
+                </TabControl>
+
+                <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+                    <Button x:Name="ExportCsvButton" Content="Exportar CSV" Style="{StaticResource OutlineButtonStyle}" Click="ExportCsv_Click" ToolTip="Exporta a aba selecionada em CSV."/>
+                    <Button x:Name="ExportXmlButton" Content="Exportar XML" Style="{StaticResource OutlineButtonStyle}" Click="ExportXml_Click" Margin="10,0,0,0" ToolTip="Exporta a aba selecionada em XML."/>
+                    <Button x:Name="ExportHtmlButton" Content="Exportar HTML" Style="{StaticResource OutlineButtonStyle}" Click="ExportHtml_Click" Margin="10,0,0,0" ToolTip="Exporta a aba selecionada em HTML."/>
+                    <Button x:Name="ExportSqlButton" Content="Exportar SQL" Style="{StaticResource OutlineButtonStyle}" Click="ExportSql_Click" Margin="10,0,0,0" ToolTip="Exporta a aba selecionada para SQL."/>
+                </StackPanel>
+
+                <TextBlock Grid.Row="2" x:Name="StatusText" Text="✔️ Pronto para iniciar a coleta." Style="{StaticResource CaptionTextStyle}" Margin="0,12,0,0"/>
+            </Grid>
         </Border>
     </Grid>
 </UserControl>

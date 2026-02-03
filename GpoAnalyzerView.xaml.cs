@@ -18,23 +18,31 @@ namespace DirectoryAnalyzer.Views
     public partial class GpoAnalyzerView : UserControl
     {
         private readonly PowerShellService _powerShellService;
-        private const string _moduleName = "GpoAnalyzer";
+        private const string ModuleName = "GpoAnalyzer";
+        private readonly ILogService _logService;
 
         public GpoAnalyzerView()
         {
             InitializeComponent();
             _powerShellService = new PowerShellService();
+            _logService = LogService.CreateLogger(ModuleName);
+            UpdateStatus("✔️ Pronto para iniciar a coleta.", "Pronto");
+            SetBusyState(false);
         }
 
         private async void RunFullGpoCollection(object sender, RoutedEventArgs e)
         {
             Button button = sender as Button;
             if (button != null) button.IsEnabled = false;
+            string correlationId = LogService.CreateCorrelationId();
 
-            // Feedback de Progresso na UI
-            ProgressText.Visibility = Visibility.Visible;
-            StatusText.Text = "⏳ Coletando informações de GPOs. Isso pode demorar vários minutos...";
-            LogService.Write(_moduleName, "Iniciando coleta completa de GPOs.");
+            SetBusyState(true);
+            UpdateStatus("⏳ Coletando informações de GPOs. Isso pode demorar vários minutos...", "Executando...");
+            _logService.Info("Iniciando coleta completa de GPOs.", correlationId);
+            bool success = false;
+            int? itemCount = null;
+            int? errorCount = null;
+            DashboardService.Instance.RecordModuleStart("GPO Analyzer");
 
             try
             {
@@ -112,24 +120,32 @@ namespace DirectoryAnalyzer.Views
                     
                     int gpoCount = resumo?.Cast<object>().Count() ?? 0;
                     string finalMessage = $"✅ Coleta finalizada. {gpoCount} GPOs encontradas.";
-                    StatusText.Text = finalMessage;
-                    LogService.Write(_moduleName, finalMessage);
+                    UpdateStatus(finalMessage, "Concluído");
+                    _logService.Info(finalMessage, correlationId);
+                    success = true;
+                    itemCount = gpoCount;
+                    errorCount = 0;
                 }
                 else 
                 { 
-                    StatusText.Text = "⚠️ Coleta concluída, mas nenhum dado foi retornado.";
-                    LogService.Write(_moduleName, "Coleta concluída sem dados.");
+                    UpdateStatus("⚠️ Coleta concluída, mas nenhum dado foi retornado.", "Concluído");
+                    _logService.Warn("Coleta concluída sem dados.", correlationId);
+                    success = true;
+                    itemCount = 0;
+                    errorCount = 0;
                 }
             }
             catch (Exception ex) 
             { 
-                StatusText.Text = "❌ Erro durante a coleta: " + ex.Message;
-                LogService.Write(_moduleName, "ERRO na coleta de GPO: " + ex.ToString());
+                UpdateStatus("❌ Erro durante a coleta: " + ex.Message, "Erro - ver log");
+                _logService.Error("ERRO na coleta de GPO: " + ex, correlationId);
+                errorCount = 1;
             }
             finally
             {
-                ProgressText.Visibility = Visibility.Collapsed;
+                SetBusyState(false);
                 if (button != null) button.IsEnabled = true;
+                DashboardService.Instance.RecordModuleFinish("GPO Analyzer", success, itemCount, errorCount);
             }
         }
 
@@ -143,14 +159,16 @@ namespace DirectoryAnalyzer.Views
 
         private void ExportCsv_Click(object sender, RoutedEventArgs e)
         {
+            string correlationId = LogService.CreateCorrelationId();
             var grid = GetSelectedGrid(out string reportType);
-            if (grid == null || !(grid.ItemsSource is IEnumerable data) || !data.Cast<object>().Any()) { StatusText.Text = "⚠️ Nenhum dado para exportar."; return; }
+            if (grid == null || !(grid.ItemsSource is IEnumerable data) || !data.Cast<object>().Any()) { UpdateStatus("⚠️ Nenhum dado para exportar.", "Pronto"); return; }
 
             var saveDialog = new SaveFileDialog { FileName = $"GPOs_{reportType}_{DateTime.Now:yyyyMMdd_HHmmss}.csv", Filter = "CSV Files (*.csv)|*.csv", Title = $"Salvar Relatório CSV de {reportType}" };
             if (saveDialog.ShowDialog() == true)
             {
                 try
                 {
+                    _logService.Info($"Iniciando exportação CSV: {saveDialog.FileName}", correlationId);
                     var sb = new StringBuilder();
                     var firstItemDict = PSObjectToDictionary(data.Cast<object>().FirstOrDefault());
                     if (firstItemDict.Any()) sb.AppendLine(string.Join(";", firstItemDict.Keys));
@@ -162,16 +180,18 @@ namespace DirectoryAnalyzer.Views
                         sb.AppendLine(string.Join(";", values));
                     }
                     File.WriteAllText(saveDialog.FileName, sb.ToString(), Encoding.UTF8);
-                    StatusText.Text = $"✅ Exportação CSV concluída: {saveDialog.FileName}";
+                    UpdateStatus($"✅ Exportação CSV concluída: {saveDialog.FileName}", "Concluído");
+                    _logService.Info("Exportação CSV concluída.", correlationId);
                 }
-                catch (Exception ex) { StatusText.Text = "❌ Erro ao exportar para CSV: " + ex.Message; }
+                catch (Exception ex) { UpdateStatus("❌ Erro ao exportar para CSV: " + ex.Message, "Erro - ver log"); _logService.Error("Erro ao exportar para CSV: " + ex, correlationId); }
             }
         }
 
         private void ExportXml_Click(object sender, RoutedEventArgs e)
         {
+            string correlationId = LogService.CreateCorrelationId();
             var grid = GetSelectedGrid(out string reportType);
-            if (grid == null || !(grid.ItemsSource is IEnumerable data) || !data.Cast<object>().Any()) { StatusText.Text = "⚠️ Nenhum dado para exportar."; return; }
+            if (grid == null || !(grid.ItemsSource is IEnumerable data) || !data.Cast<object>().Any()) { UpdateStatus("⚠️ Nenhum dado para exportar.", "Pronto"); return; }
 
             string rootElementName = $"GPOs_{reportType.Replace(" ", "").Replace("(", "_").Replace(")", "")}";
             var saveDialog = new SaveFileDialog { FileName = $"{rootElementName}_{DateTime.Now:yyyyMMdd_HHmmss}.xml", Filter = "XML Files (*.xml)|*.xml", Title = $"Salvar Relatório XML de {reportType}" };
@@ -180,6 +200,7 @@ namespace DirectoryAnalyzer.Views
             {
                 try
                 {
+                    _logService.Info($"Iniciando exportação XML: {saveDialog.FileName}", correlationId);
                     using (var writer = new XmlTextWriter(saveDialog.FileName, Encoding.UTF8))
                     {
                         writer.Formatting = Formatting.Indented;
@@ -193,22 +214,25 @@ namespace DirectoryAnalyzer.Views
                         }
                         writer.WriteEndElement(); writer.WriteEndDocument();
                     }
-                    StatusText.Text = $"✅ Exportação XML concluída: {saveDialog.FileName}";
+                    UpdateStatus($"✅ Exportação XML concluída: {saveDialog.FileName}", "Concluído");
+                    _logService.Info("Exportação XML concluída.", correlationId);
                 }
-                catch (Exception ex) { StatusText.Text = "❌ Erro ao exportar para XML: " + ex.Message; }
+                catch (Exception ex) { UpdateStatus("❌ Erro ao exportar para XML: " + ex.Message, "Erro - ver log"); _logService.Error("Erro ao exportar para XML: " + ex, correlationId); }
             }
         }
 
         private void ExportHtml_Click(object sender, RoutedEventArgs e)
         {
+            string correlationId = LogService.CreateCorrelationId();
             var grid = GetSelectedGrid(out string reportType);
-            if (grid == null || !(grid.ItemsSource is IEnumerable data) || !data.Cast<object>().Any()) { StatusText.Text = "⚠️ Nenhum dado para exportar."; return; }
+            if (grid == null || !(grid.ItemsSource is IEnumerable data) || !data.Cast<object>().Any()) { UpdateStatus("⚠️ Nenhum dado para exportar.", "Pronto"); return; }
 
             var saveDialog = new SaveFileDialog { FileName = $"GPOs_{reportType}_{DateTime.Now:yyyyMMdd_HHmmss}.html", Filter = "HTML Files (*.html)|*.html", Title = $"Salvar Relatório HTML de {reportType}" };
             if (saveDialog.ShowDialog() == true)
             {
                 try
                 {
+                    _logService.Info($"Iniciando exportação HTML: {saveDialog.FileName}", correlationId);
                     var sb = new StringBuilder();
                     sb.AppendLine($"<html><head><meta charset='UTF-8'><title>Relatório de {reportType}</title><style>body{{font-family:sans-serif}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #dddddd;text-align:left;padding:8px}}tr:nth-child(even){{background-color:#f2f2f2}}</style></head><body>");
                     sb.AppendLine($"<h2>Relatório de {reportType}</h2><table>");
@@ -228,16 +252,18 @@ namespace DirectoryAnalyzer.Views
                     }
                     sb.AppendLine("</table></body></html>");
                     File.WriteAllText(saveDialog.FileName, sb.ToString(), Encoding.UTF8);
-                    StatusText.Text = $"✅ Exportação HTML concluída: {saveDialog.FileName}";
+                    UpdateStatus($"✅ Exportação HTML concluída: {saveDialog.FileName}", "Concluído");
+                    _logService.Info("Exportação HTML concluída.", correlationId);
                 }
-                catch (Exception ex) { StatusText.Text = "❌ Erro ao exportar para HTML: " + ex.Message; }
+                catch (Exception ex) { UpdateStatus("❌ Erro ao exportar para HTML: " + ex.Message, "Erro - ver log"); _logService.Error("Erro ao exportar para HTML: " + ex, correlationId); }
             }
         }
 
         private void ExportSql_Click(object sender, RoutedEventArgs e)
         {
+            string correlationId = LogService.CreateCorrelationId();
             var grid = GetSelectedGrid(out string reportType);
-            if (grid == null || !(grid.ItemsSource is IEnumerable data) || !data.Cast<object>().Any()) { StatusText.Text = "⚠️ Nenhum dado para exportar."; return; }
+            if (grid == null || !(grid.ItemsSource is IEnumerable data) || !data.Cast<object>().Any()) { UpdateStatus("⚠️ Nenhum dado para exportar.", "Pronto"); return; }
             
             var dataForSql = new List<dynamic>();
             foreach (var item in data) dataForSql.Add(PSObjectToDictionary(item));
@@ -255,18 +281,18 @@ namespace DirectoryAnalyzer.Views
                     string timeStamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
                     string tableNameWithTimestamp = $"GPOs_{tableNameReportType}_{timeStamp}";
                     
-                    LogService.Write(_moduleName, $"Iniciando exportação SQL para tabela '{tableNameWithTimestamp}'.");
+                    _logService.Info($"Iniciando exportação SQL para tabela '{tableNameWithTimestamp}'.", correlationId);
                     ExportService.ExportToSql(dataForSql, tableNameWithTimestamp, dialog.ConnectionString);
                     
                     string successMessage = $"✅ Exportação SQL concluída.\nBanco: {dialog.DatabaseName}\nTabela: {tableNameWithTimestamp}";
-                    StatusText.Text = successMessage;
-                    LogService.Write(_moduleName, $"Exportação SQL para a tabela '{tableNameWithTimestamp}' concluída com sucesso.");
+                    UpdateStatus(successMessage, "Concluído");
+                    _logService.Info($"Exportação SQL para a tabela '{tableNameWithTimestamp}' concluída com sucesso.", correlationId);
                 }
             }
             catch (Exception ex) 
             { 
-                StatusText.Text = "❌ Erro ao exportar para SQL: " + ex.Message;
-                LogService.Write(_moduleName, "ERRO na exportação para SQL: " + ex.ToString());
+                UpdateStatus("❌ Erro ao exportar para SQL: " + ex.Message, "Erro - ver log");
+                _logService.Error("ERRO na exportação para SQL: " + ex, correlationId);
             }
         }
         
@@ -294,6 +320,23 @@ namespace DirectoryAnalyzer.Views
                 return d;
             }
             return dictionary;
+        }
+
+        private void UpdateStatus(string message, string globalStatus)
+        {
+            StatusText.Text = message;
+            StatusService.Instance.SetStatus(globalStatus);
+        }
+
+        private void SetBusyState(bool isBusy)
+        {
+            ProgressBar.Visibility = isBusy ? Visibility.Visible : Visibility.Collapsed;
+            ProgressText.Visibility = isBusy ? Visibility.Visible : Visibility.Collapsed;
+            ExecuteButton.IsEnabled = !isBusy;
+            ExportCsvButton.IsEnabled = !isBusy;
+            ExportXmlButton.IsEnabled = !isBusy;
+            ExportHtmlButton.IsEnabled = !isBusy;
+            ExportSqlButton.IsEnabled = !isBusy;
         }
     }
 }
