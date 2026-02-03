@@ -3,9 +3,14 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net48</TargetFramework>
     <UseWPF>true</UseWPF>
-    <!-- Keep Properties\AssemblyInfo.cs as the single source of truth. -->
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+
+    <AssemblyTitle>DirectoryAnalyzer</AssemblyTitle>
+    <Product>DirectoryAnalyzer</Product>
+    <Company>DirectoryAnalyzer</Company>
+    <AssemblyConfiguration></AssemblyConfiguration>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <InformationalVersion>1.0.0.0</InformationalVersion>
 
     <!-- Atualização aqui: C# mais recente -->
     <LangVersion>latest</LangVersion>
@@ -16,6 +21,14 @@
   </PropertyGroup>
   <ItemGroup>
     <Content Include="Logo_Tisco_Em-Alta_sem-borda.fw.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="DirectoryAnalyzer.SmokeTests\**\*.cs" />
+    <EmbeddedResource Remove="DirectoryAnalyzer.SmokeTests\**\*" />
+    <None Remove="DirectoryAnalyzer.SmokeTests\**\*" />
+    <Page Remove="DirectoryAnalyzer.SmokeTests\**\*" />
+    <Resource Remove="DirectoryAnalyzer.SmokeTests\**\*" />
   </ItemGroup>
 
   <ItemGroup>
