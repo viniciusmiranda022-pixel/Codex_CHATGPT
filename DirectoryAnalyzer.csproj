@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWPF>true</UseWPF>
+
+    <!-- Atualização aqui: C# mais recente -->
+    <LangVersion>latest</LangVersion>
+
+    <!-- Opcional: você pode desativar o Nullable se quiser evitar avisos -->
+    <Nullable>disable</Nullable>
+    <ApplicationIcon>Logo_Tisco_Em-Alta_sem-borda.fw.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="Logo_Tisco_Em-Alta_sem-borda.fw.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MahApps.Metro" Version="2.4.10" />
+    <PackageReference Include="Microsoft.PowerShell.5.ReferenceAssemblies" Version="1.1.0" />
+    <PackageReference Include="System.Data.SqlClient" Version="4.8.6" />
+    <PackageReference Include="System.DirectoryServices" Version="9.0.5" />
+    <PackageReference Include="System.DirectoryServices.AccountManagement" Version="9.0.5" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="9.0.5" />
+    <PackageReference Include="System.Management" Version="7.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Dialogs\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+</Project>
