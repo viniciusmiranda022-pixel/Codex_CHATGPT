@@ -59,12 +59,17 @@ namespace DirectoryAnalyzer.ViewModels
             _cancellationTokenSource = new CancellationTokenSource();
             var progress = new Progress<string>(message => ProgressMessage = message);
             string correlationId = LogService.CreateCorrelationId();
+            bool wasCanceled = false;
+            bool success = false;
+            int? itemCount = null;
+            int? errorCount = null;
 
             IsBusy = true;
             UpdateCommandStates();
             ProgressMessage = "⏳ Coletando informações de DNS...";
             SetStatus("⏳ Coletando informações de DNS...", "Executando...");
             _logService.Info("Iniciando coleta de DNS.", correlationId);
+            DashboardService.Instance.RecordModuleStart("DNS Analyzer");
 
             try
             {
@@ -91,22 +96,28 @@ namespace DirectoryAnalyzer.ViewModels
 
                 SetStatus($"✅ Coleta finalizada. {Zones.Count} zonas, {Records.Count} registros, {Forwarders.Count} encaminhadores.", "Concluído");
                 _logService.Info("Coleta de DNS concluída.", correlationId);
+                success = true;
+                itemCount = Zones.Count + Records.Count + Forwarders.Count;
+                errorCount = 0;
             }
             catch (OperationCanceledException)
             {
                 SetStatus("⚠️ Coleta cancelada pelo usuário.", "Pronto");
                 _logService.Warn("Coleta cancelada pelo usuário.", correlationId);
+                wasCanceled = true;
             }
             catch (Exception ex)
             {
                 SetStatus("❌ Erro durante a coleta: " + ex.Message, "Erro - ver log");
                 _logService.Error("ERRO na coleta de DNS: " + ex, correlationId);
+                errorCount = 1;
             }
             finally
             {
                 ProgressMessage = string.Empty;
                 IsBusy = false;
                 UpdateCommandStates();
+                DashboardService.Instance.RecordModuleFinish("DNS Analyzer", success, itemCount, errorCount, wasCanceled);
             }
         }
 

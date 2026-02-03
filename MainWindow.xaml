@@ -13,38 +13,54 @@
 
         <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="240"/>
+                <ColumnDefinition Width="260"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
             <!-- Menu Lateral -->
             <Border Grid.Column="0" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0">
-                <StackPanel Margin="16,24">
+                <StackPanel Margin="18,26">
                     <TextBlock Text="Directory Analyzer"
                                Style="{StaticResource TitleTextStyle}"
                                Margin="0,0,0,4"/>
                     <TextBlock Text="Análise corporativa read-only"
                                Style="{StaticResource SubtitleTextStyle}"
-                               Margin="0,0,0,20"/>
+                               Margin="0,0,0,18"/>
                     <ListBox x:Name="NavigationMenu"
                              SelectedIndex="0"
                              SelectionChanged="NavigationMenu_SelectionChanged">
+                        <ListBoxItem Content="Dashboard"/>
+                        <ListBoxItem IsHitTestVisible="False" Focusable="False">
+                            <TextBlock Text="INFRAESTRUTURA" Style="{StaticResource NavSectionTextStyle}"/>
+                        </ListBoxItem>
                         <ListBoxItem Content="DNS Analyzer"/>
-                        <ListBoxItem Content="GPO Analyzer"/>
                         <ListBoxItem Content="SMB Shares Analyzer"/>
                         <ListBoxItem Content="Scheduled Tasks Analyzer"/>
+                        <ListBoxItem Content="IIS AppPools Analyzer"/>
+
+                        <ListBoxItem IsHitTestVisible="False" Focusable="False">
+                            <TextBlock Text="SEGURANÇA" Style="{StaticResource NavSectionTextStyle}"/>
+                        </ListBoxItem>
+                        <ListBoxItem Content="Local Security Policy Analyzer"/>
+                        <ListBoxItem Content="Trusts Analyzer"/>
+
+                        <ListBoxItem IsHitTestVisible="False" Focusable="False">
+                            <TextBlock Text="IDENTIDADE" Style="{StaticResource NavSectionTextStyle}"/>
+                        </ListBoxItem>
+                        <ListBoxItem Content="GPO Analyzer"/>
                         <ListBoxItem Content="Local Profiles Analyzer"/>
                         <ListBoxItem Content="Service Account Analyzer"/>
-                        <ListBoxItem Content="Local Security Policy Analyzer"/>
-                        <ListBoxItem Content="IIS AppPools Analyzer"/>
-                        <ListBoxItem Content="Trusts Analyzer"/>
+
+                        <ListBoxItem IsHitTestVisible="False" Focusable="False">
+                            <TextBlock Text="MENSAGERIA" Style="{StaticResource NavSectionTextStyle}"/>
+                        </ListBoxItem>
                         <ListBoxItem Content="ProxyAddresses Analyzer"/>
                     </ListBox>
                 </StackPanel>
             </Border>
 
             <!-- Conteúdo Principal -->
-            <Grid Grid.Column="1" Margin="24">
+            <Grid Grid.Column="1" Margin="26">
                 <ContentControl x:Name="ContentArea"/>
             </Grid>
         </Grid>

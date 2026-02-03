@@ -26,6 +26,7 @@ namespace DirectoryAnalyzer.Views
             _powerShellService = new PowerShellService();
             _logService = LogService.CreateLogger(ModuleName);
             UpdateStatus("✔️ Pronto para iniciar a coleta.", "Pronto");
+            SetBusyState(false);
         }
 
         private async void RunServicesCollection(object sender, RoutedEventArgs e)
@@ -33,8 +34,11 @@ namespace DirectoryAnalyzer.Views
             Button button = sender as Button;
             if (button != null) button.IsEnabled = false;
             string correlationId = LogService.CreateCorrelationId();
+            bool success = false;
+            int? itemCount = null;
+            int? errorCount = null;
 
-            ProgressText.Visibility = Visibility.Visible;
+            SetBusyState(true);
             UpdateStatus("⏳ Coletando informações de serviços instalados...", "Executando...");
 
             string scopeAttribute = ScopeAttributeBox.Text;
@@ -43,12 +47,13 @@ namespace DirectoryAnalyzer.Views
             if (string.IsNullOrWhiteSpace(scopeAttribute) || string.IsNullOrWhiteSpace(scopeValue))
             {
                 UpdateStatus("⚠️ Por favor, preencha o Atributo de Escopo e o Valor do Atributo.", "Pronto");
-                ProgressText.Visibility = Visibility.Collapsed;
+                SetBusyState(false);
                 if (button != null) button.IsEnabled = true;
                 return;
             }
 
             _logService.Info($"Iniciando coleta com critério: {scopeAttribute} = '{scopeValue}'.", correlationId);
+            DashboardService.Instance.RecordModuleStart("Service Account Analyzer");
 
             try
             {
@@ -96,17 +101,22 @@ namespace DirectoryAnalyzer.Views
                 string finalMessage = $"✅ Coleta concluída. {results.Count} serviços totais | {domainAccounts.Count} com contas de domínio | {localAccounts.Count} com contas locais.";
                 UpdateStatus(finalMessage, "Concluído");
                 _logService.Info(finalMessage, correlationId);
+                success = true;
+                itemCount = results.Count;
+                errorCount = 0;
             }
             catch (Exception ex)
             {
                 UpdateStatus("❌ Erro durante a coleta: " + ex.Message, "Erro - ver log");
                 _logService.Error("ERRO GERAL NA COLETA: " + ex, correlationId);
+                errorCount = 1;
             }
             finally
             {
-                ProgressText.Visibility = Visibility.Collapsed;
+                SetBusyState(false);
                 if (button != null) button.IsEnabled = true;
                 _logService.Info("Execução finalizada.", correlationId);
+                DashboardService.Instance.RecordModuleFinish("Service Account Analyzer", success, itemCount, errorCount);
             }
         }
 
@@ -250,6 +260,17 @@ namespace DirectoryAnalyzer.Views
         {
             StatusText.Text = message;
             StatusService.Instance.SetStatus(globalStatus);
+        }
+
+        private void SetBusyState(bool isBusy)
+        {
+            ProgressBar.Visibility = isBusy ? Visibility.Visible : Visibility.Collapsed;
+            ProgressText.Visibility = isBusy ? Visibility.Visible : Visibility.Collapsed;
+            ExecuteButton.IsEnabled = !isBusy;
+            ExportCsvButton.IsEnabled = !isBusy;
+            ExportXmlButton.IsEnabled = !isBusy;
+            ExportHtmlButton.IsEnabled = !isBusy;
+            ExportSqlButton.IsEnabled = !isBusy;
         }
 
         private DataGrid GetSelectedGrid(out string reportType)

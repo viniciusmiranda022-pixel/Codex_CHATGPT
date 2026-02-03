@@ -74,6 +74,8 @@ namespace DirectoryAnalyzer.Services
 
         public string ModuleName { get; }
 
+        public string FilePath => _filePath;
+
         public event EventHandler<LogEntry> EntryAdded;
 
         public IReadOnlyCollection<LogEntry> Buffer => _buffer.ToArray();
@@ -86,6 +88,12 @@ namespace DirectoryAnalyzer.Services
             }
 
             return Loggers.GetOrAdd(moduleName, _ => new LogService(moduleName, enableBuffer, bufferCapacity));
+        }
+
+        public static string GetLogFilePath(string moduleName = "General")
+        {
+            var logger = CreateLogger(moduleName) as LogService;
+            return logger?._filePath;
         }
 
         public static void Write(string moduleName, string message, LogLevel level = LogLevel.Info)

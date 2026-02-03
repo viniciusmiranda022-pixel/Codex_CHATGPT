@@ -26,6 +26,7 @@ namespace DirectoryAnalyzer.Views
             _powerShellService = new PowerShellService();
             _logService = LogService.CreateLogger(ModuleName);
             UpdateStatus("✔️ Pronto para iniciar a coleta.", "Pronto");
+            SetBusyState(false);
         }
 
         private async void RunSmbCollection(object sender, RoutedEventArgs e)
@@ -33,8 +34,11 @@ namespace DirectoryAnalyzer.Views
             Button button = sender as Button;
             if (button != null) button.IsEnabled = false;
             string correlationId = LogService.CreateCorrelationId();
+            bool success = false;
+            int? itemCount = null;
+            int? errorCount = null;
             
-            ProgressText.Visibility = Visibility.Visible;
+            SetBusyState(true);
             UpdateStatus("⏳ Coletando informações de compartilhamentos SMB. Isso pode demorar...", "Executando...");
 
             string scopeAttribute = ScopeAttributeBox.Text;
@@ -43,12 +47,13 @@ namespace DirectoryAnalyzer.Views
             if (string.IsNullOrWhiteSpace(scopeAttribute) || string.IsNullOrWhiteSpace(scopeValue))
             {
                 UpdateStatus("⚠️ Por favor, preencha o Atributo de Escopo e o Valor do Atributo.", "Pronto");
-                ProgressText.Visibility = Visibility.Collapsed;
+                SetBusyState(false);
                 if (button != null) button.IsEnabled = true;
                 return;
             }
 
             _logService.Info($"Iniciando coleta com critério: {scopeAttribute} = '{scopeValue}'.", correlationId);
+            DashboardService.Instance.RecordModuleStart("SMB Shares Analyzer");
             
             try
             {
@@ -85,12 +90,18 @@ namespace DirectoryAnalyzer.Views
                 if (!results.Any())
                 {
                     UpdateStatus("✅ Coleta concluída. Nenhum compartilhamento encontrado para os critérios especificados.", "Concluído");
+                    success = true;
+                    itemCount = 0;
+                    errorCount = 0;
                 }
                 else
                 {
                     var errorRows = results.Count(item => (item as IDictionary<string, object>)["IdentityReference"].ToString().Contains("ERRO"));
                     var successRows = results.Count - errorRows;
                     UpdateStatus($"✅ Coleta concluída. {successRows} permissões encontradas com {errorRows} erros de acesso/conexão.", "Concluído");
+                    success = true;
+                    itemCount = results.Count;
+                    errorCount = errorRows;
                 }
                 _logService.Info(StatusText.Text, correlationId);
             }
@@ -98,12 +109,14 @@ namespace DirectoryAnalyzer.Views
             {
                 UpdateStatus("❌ Erro durante a coleta: " + ex.Message, "Erro - ver log");
                 _logService.Error("ERRO GERAL NA COLETA: " + ex, correlationId);
+                errorCount = 1;
             }
             finally
             {
-                ProgressText.Visibility = Visibility.Collapsed;
+                SetBusyState(false);
                 if (button != null) button.IsEnabled = true;
                 _logService.Info("Execução finalizada.", correlationId);
+                DashboardService.Instance.RecordModuleFinish("SMB Shares Analyzer", success, itemCount, errorCount);
             }
         }
         
@@ -244,6 +257,17 @@ namespace DirectoryAnalyzer.Views
         {
             StatusText.Text = message;
             StatusService.Instance.SetStatus(globalStatus);
+        }
+
+        private void SetBusyState(bool isBusy)
+        {
+            ProgressBar.Visibility = isBusy ? Visibility.Visible : Visibility.Collapsed;
+            ProgressText.Visibility = isBusy ? Visibility.Visible : Visibility.Collapsed;
+            ExecuteButton.IsEnabled = !isBusy;
+            ExportCsvButton.IsEnabled = !isBusy;
+            ExportXmlButton.IsEnabled = !isBusy;
+            ExportHtmlButton.IsEnabled = !isBusy;
+            ExportSqlButton.IsEnabled = !isBusy;
         }
     }
 }

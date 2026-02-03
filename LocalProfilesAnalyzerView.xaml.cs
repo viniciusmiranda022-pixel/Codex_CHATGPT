@@ -26,6 +26,7 @@ namespace DirectoryAnalyzer.Views
             _powerShellService = new PowerShellService();
             _logService = LogService.CreateLogger(ModuleName);
             UpdateStatus("✔️ Pronto para iniciar a coleta.", "Pronto");
+            SetBusyState(false);
         }
 
         private async void RunProfileCollection(object sender, RoutedEventArgs e)
@@ -33,8 +34,11 @@ namespace DirectoryAnalyzer.Views
             Button button = sender as Button;
             if (button != null) button.IsEnabled = false;
             string correlationId = LogService.CreateCorrelationId();
+            bool success = false;
+            int? itemCount = null;
+            int? errorCount = null;
 
-            ProgressText.Visibility = Visibility.Visible;
+            SetBusyState(true);
             UpdateStatus("⏳ Coletando informações de perfis locais. Isso pode demorar...", "Executando...");
 
             string scopeAttribute = ScopeAttributeBox.Text;
@@ -43,12 +47,13 @@ namespace DirectoryAnalyzer.Views
             if (string.IsNullOrWhiteSpace(scopeAttribute) || string.IsNullOrWhiteSpace(scopeValue))
             {
                 UpdateStatus("⚠️ Por favor, preencha o Atributo de Escopo e o Valor do Atributo.", "Pronto");
-                ProgressText.Visibility = Visibility.Collapsed;
+                SetBusyState(false);
                 if (button != null) button.IsEnabled = true;
                 return;
             }
 
             _logService.Info($"Iniciando coleta com critério: {scopeAttribute} = '{scopeValue}'.", correlationId);
+            DashboardService.Instance.RecordModuleStart("Local Profiles Analyzer");
             
             try
             {
@@ -99,17 +104,22 @@ namespace DirectoryAnalyzer.Views
                 var successRows = results.Count - errorRows;
                 UpdateStatus($"✅ Coleta concluída. {successRows} perfis encontrados com {errorRows} erros de acesso/conexão.", "Concluído");
                 _logService.Info(StatusText.Text, correlationId);
+                success = true;
+                itemCount = results.Count;
+                errorCount = errorRows;
             }
             catch (Exception ex)
             {
                 UpdateStatus("❌ Erro durante a coleta: " + ex.Message, "Erro - ver log");
                 _logService.Error("ERRO GERAL NA COLETA: " + ex, correlationId);
+                errorCount = 1;
             }
             finally
             {
-                ProgressText.Visibility = Visibility.Collapsed;
+                SetBusyState(false);
                 if (button != null) button.IsEnabled = true;
                 _logService.Info("Execução finalizada.", correlationId);
+                DashboardService.Instance.RecordModuleFinish("Local Profiles Analyzer", success, itemCount, errorCount);
             }
         }
 
@@ -250,6 +260,17 @@ namespace DirectoryAnalyzer.Views
         {
             StatusText.Text = message;
             StatusService.Instance.SetStatus(globalStatus);
+        }
+
+        private void SetBusyState(bool isBusy)
+        {
+            ProgressBar.Visibility = isBusy ? Visibility.Visible : Visibility.Collapsed;
+            ProgressText.Visibility = isBusy ? Visibility.Visible : Visibility.Collapsed;
+            ExecuteButton.IsEnabled = !isBusy;
+            ExportCsvButton.IsEnabled = !isBusy;
+            ExportXmlButton.IsEnabled = !isBusy;
+            ExportHtmlButton.IsEnabled = !isBusy;
+            ExportSqlButton.IsEnabled = !isBusy;
         }
     }
 }

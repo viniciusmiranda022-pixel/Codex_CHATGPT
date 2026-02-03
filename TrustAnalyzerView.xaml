@@ -12,8 +12,6 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0" Style="{StaticResource CardStyle}">
@@ -22,34 +20,46 @@
                     <TextBlock Text="Trusts Analyzer" Style="{StaticResource TitleTextStyle}"/>
                     <TextBlock Text="Relações de confiança e configurações." Style="{StaticResource SubtitleTextStyle}" Margin="0,6,0,0"/>
                 </StackPanel>
-                <Button DockPanel.Dock="Right"
+                <Button x:Name="ExecuteButton"
+                        DockPanel.Dock="Right"
                         Content="Executar Coleta"
                         Style="{StaticResource PrimaryButtonStyle}"
                         Click="RunTrustsCollection"/>
             </DockPanel>
         </Border>
 
-        <TextBlock x:Name="ProgressText"
-                   Grid.Row="1"
-                   Text="⏳ Coletando informações de trusts..."
-                   Style="{StaticResource CaptionTextStyle}"
-                   Foreground="{StaticResource PrimaryBrush}"
-                   Visibility="Collapsed"
-                   Margin="6,12,0,0"/>
-
-        <Border Grid.Row="2" Style="{StaticResource CardStyle}" Margin="0,16,0,0">
-            <DataGrid x:Name="TrustsGrid" AutoGenerateColumns="True"/>
-        </Border>
-
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-            <Button Content="Exportar CSV" Style="{StaticResource OutlineButtonStyle}" Click="ExportCsv_Click"/>
-            <Button Content="Exportar XML" Style="{StaticResource OutlineButtonStyle}" Click="ExportXml_Click" Margin="10,0,0,0"/>
-            <Button Content="Exportar HTML" Style="{StaticResource OutlineButtonStyle}" Click="ExportHtml_Click" Margin="10,0,0,0"/>
-            <Button Content="Exportar SQL" Style="{StaticResource OutlineButtonStyle}" Click="ExportSql_Click" Margin="10,0,0,0"/>
+        <StackPanel Grid.Row="1" Margin="2,10,0,0">
+            <ProgressBar x:Name="ProgressBar"
+                         IsIndeterminate="True"
+                         Style="{StaticResource InlineProgressBarStyle}"
+                         Visibility="Collapsed"/>
+            <TextBlock x:Name="ProgressText"
+                       Text="⏳ Coletando informações de trusts..."
+                       Style="{StaticResource CaptionTextStyle}"
+                       Foreground="{StaticResource PrimaryBrush}"
+                       Visibility="Collapsed"
+                       Margin="0,8,0,0"/>
         </StackPanel>
 
-        <Border Grid.Row="4" Style="{StaticResource CardStyle}" Margin="0,16,0,0" Padding="12">
-            <TextBlock x:Name="StatusText" Text="✔️ Pronto para iniciar a coleta." Style="{StaticResource CaptionTextStyle}"/>
+        <Border Grid.Row="2" Style="{StaticResource CardStyle}" Margin="0,16,0,0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <DataGrid x:Name="TrustsGrid" AutoGenerateColumns="True"/>
+
+                <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+                    <Button x:Name="ExportCsvButton" Content="Exportar CSV" Style="{StaticResource OutlineButtonStyle}" Click="ExportCsv_Click" ToolTip="Exporta a lista atual em CSV."/>
+                    <Button x:Name="ExportXmlButton" Content="Exportar XML" Style="{StaticResource OutlineButtonStyle}" Click="ExportXml_Click" Margin="10,0,0,0" ToolTip="Exporta a lista atual em XML."/>
+                    <Button x:Name="ExportHtmlButton" Content="Exportar HTML" Style="{StaticResource OutlineButtonStyle}" Click="ExportHtml_Click" Margin="10,0,0,0" ToolTip="Exporta a lista atual em HTML."/>
+                    <Button x:Name="ExportSqlButton" Content="Exportar SQL" Style="{StaticResource OutlineButtonStyle}" Click="ExportSql_Click" Margin="10,0,0,0" ToolTip="Exporta a lista atual para SQL."/>
+                </StackPanel>
+
+                <TextBlock Grid.Row="2" x:Name="StatusText" Text="✔️ Pronto para iniciar a coleta." Style="{StaticResource CaptionTextStyle}" Margin="0,12,0,0"/>
+            </Grid>
         </Border>
     </Grid>
 </UserControl>
