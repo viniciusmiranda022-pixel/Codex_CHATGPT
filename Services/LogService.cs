@@ -38,6 +38,7 @@ namespace DirectoryAnalyzer.Services
         void Info(string message);
         void Warn(string message);
         void Error(string message);
+        void Write(LogLevel level, string message);
     }
 
     public sealed class LogService : ILogService
@@ -92,7 +93,7 @@ namespace DirectoryAnalyzer.Services
 
         public void Error(string message) => Write(LogLevel.Error, message);
 
-        private void Write(LogLevel level, string message)
+        public void Write(LogLevel level, string message)
         {
             string safeMessage = message ?? string.Empty;
             var entry = new LogEntry(DateTime.Now, ModuleName, level, safeMessage);
