@@ -10,6 +10,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+<<<<<<< HEAD
         </Grid.RowDefinitions>
 
         <!-- Header -->
@@ -74,6 +75,63 @@
                            Style="{StaticResource CaptionTextStyle}"
                            Margin="0,12,0,0"/>
             </Grid>
+=======
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Style="{StaticResource CardStyle}">
+            <DockPanel LastChildFill="False">
+                <StackPanel>
+                    <TextBlock Text="DNS Analyzer" Style="{StaticResource TitleTextStyle}"/>
+                    <TextBlock Text="Coleta completa de zonas, registros e encaminhadores." Style="{StaticResource SubtitleTextStyle}" Margin="0,6,0,0"/>
+                </StackPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="Executar Coleta" Style="{StaticResource PrimaryButtonStyle}" Command="{Binding RunCommand}"/>
+                    <Button Content="Cancelar" Style="{StaticResource DangerButtonStyle}" Command="{Binding CancelCommand}" Margin="10,0,0,0"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Mensagem de Progresso -->
+        <TextBlock x:Name="ProgressText"
+                   Grid.Row="1"
+                   Text="{Binding ProgressMessage}"
+                   Style="{StaticResource CaptionTextStyle}"
+                   Foreground="{StaticResource PrimaryBrush}"
+                   Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}"
+                   Margin="6,12,0,0"/>
+
+        <!-- Abas -->
+        <Border Grid.Row="2" Style="{StaticResource CardStyle}" Margin="0,16,0,0">
+            <TabControl x:Name="ReportTabs" SelectedIndex="{Binding SelectedTabIndex}">
+                <TabItem Header="Zonas">
+                    <DataGrid x:Name="ZonasGrid" AutoGenerateColumns="True" ItemsSource="{Binding Zones}"/>
+                </TabItem>
+
+                <TabItem Header="Registros">
+                    <DataGrid x:Name="RegistrosGrid" AutoGenerateColumns="True" ItemsSource="{Binding Records}"/>
+                </TabItem>
+
+                <TabItem Header="Encaminhadores">
+                    <DataGrid x:Name="ForwardersGrid" AutoGenerateColumns="True" ItemsSource="{Binding Forwarders}"/>
+                </TabItem>
+            </TabControl>
+        </Border>
+
+        <!-- Botões de Exportação -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="Exportar CSV" Style="{StaticResource OutlineButtonStyle}" Command="{Binding ExportCsvCommand}"/>
+            <Button Content="Exportar XML" Style="{StaticResource OutlineButtonStyle}" Command="{Binding ExportXmlCommand}" Margin="10,0,0,0"/>
+            <Button Content="Exportar HTML" Style="{StaticResource OutlineButtonStyle}" Command="{Binding ExportHtmlCommand}" Margin="10,0,0,0"/>
+            <Button Content="Exportar SQL" Style="{StaticResource OutlineButtonStyle}" Command="{Binding ExportSqlCommand}" Margin="10,0,0,0"/>
+        </StackPanel>
+
+        <!-- Status -->
+        <Border Grid.Row="4" Style="{StaticResource CardStyle}" Margin="0,16,0,0" Padding="12">
+            <TextBlock x:Name="StatusText" Text="{Binding StatusMessage}" Style="{StaticResource CaptionTextStyle}"/>
+>>>>>>> origin/main
         </Border>
     </Grid>
 </UserControl>
