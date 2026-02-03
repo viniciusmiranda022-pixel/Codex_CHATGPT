@@ -29,32 +29,98 @@
                     <ListBox x:Name="NavigationMenu"
                              SelectedIndex="0"
                              SelectionChanged="NavigationMenu_SelectionChanged">
-                        <ListBoxItem Content="Dashboard"/>
+                        <ListBoxItem>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE80F;" Style="{StaticResource NavIconStyle}"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                                <TextBlock Text="Dashboard" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </ListBoxItem>
                         <ListBoxItem IsHitTestVisible="False" Focusable="False">
                             <TextBlock Text="INFRAESTRUTURA" Style="{StaticResource NavSectionTextStyle}"/>
                         </ListBoxItem>
-                        <ListBoxItem Content="DNS Analyzer"/>
-                        <ListBoxItem Content="SMB Shares Analyzer"/>
-                        <ListBoxItem Content="Scheduled Tasks Analyzer"/>
-                        <ListBoxItem Content="IIS AppPools Analyzer"/>
+                        <ListBoxItem>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE774;" Style="{StaticResource NavIconStyle}"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                                <TextBlock Text="DNS Analyzer" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </ListBoxItem>
+                        <ListBoxItem>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE8B7;" Style="{StaticResource NavIconStyle}"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                                <TextBlock Text="SMB Shares Analyzer" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </ListBoxItem>
+                        <ListBoxItem>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE823;" Style="{StaticResource NavIconStyle}"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                                <TextBlock Text="Scheduled Tasks Analyzer" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </ListBoxItem>
+                        <ListBoxItem>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE7F8;" Style="{StaticResource NavIconStyle}"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                                <TextBlock Text="IIS AppPools Analyzer" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </ListBoxItem>
 
                         <ListBoxItem IsHitTestVisible="False" Focusable="False">
                             <TextBlock Text="SEGURANÇA" Style="{StaticResource NavSectionTextStyle}"/>
                         </ListBoxItem>
-                        <ListBoxItem Content="Local Security Policy Analyzer"/>
-                        <ListBoxItem Content="Trusts Analyzer"/>
+                        <ListBoxItem>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE72E;" Style="{StaticResource NavIconStyle}"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                                <TextBlock Text="Local Security Policy Analyzer" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </ListBoxItem>
+                        <ListBoxItem>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE8D7;" Style="{StaticResource NavIconStyle}"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                                <TextBlock Text="Trusts Analyzer" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </ListBoxItem>
 
                         <ListBoxItem IsHitTestVisible="False" Focusable="False">
                             <TextBlock Text="IDENTIDADE" Style="{StaticResource NavSectionTextStyle}"/>
                         </ListBoxItem>
-                        <ListBoxItem Content="GPO Analyzer"/>
-                        <ListBoxItem Content="Local Profiles Analyzer"/>
-                        <ListBoxItem Content="Service Account Analyzer"/>
+                        <ListBoxItem>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE716;" Style="{StaticResource NavIconStyle}"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                                <TextBlock Text="GPO Analyzer" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </ListBoxItem>
+                        <ListBoxItem>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE77B;" Style="{StaticResource NavIconStyle}"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                                <TextBlock Text="Local Profiles Analyzer" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </ListBoxItem>
+                        <ListBoxItem>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE9D9;" Style="{StaticResource NavIconStyle}"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                                <TextBlock Text="Service Account Analyzer" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </ListBoxItem>
 
                         <ListBoxItem IsHitTestVisible="False" Focusable="False">
                             <TextBlock Text="MENSAGERIA" Style="{StaticResource NavSectionTextStyle}"/>
                         </ListBoxItem>
-                        <ListBoxItem Content="ProxyAddresses Analyzer"/>
+                        <ListBoxItem>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE715;" Style="{StaticResource NavIconStyle}"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                                <TextBlock Text="ProxyAddresses Analyzer" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </ListBoxItem>
                     </ListBox>
                 </StackPanel>
             </Border>

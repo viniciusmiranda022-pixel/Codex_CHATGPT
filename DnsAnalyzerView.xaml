@@ -71,10 +71,18 @@
                     <Button Content="Exportar SQL" Style="{StaticResource OutlineButtonStyle}" Command="{Binding ExportSqlCommand}" Margin="10,0,0,0" ToolTip="Exporta a aba selecionada para SQL."/>
                 </StackPanel>
 
-                <TextBlock Grid.Row="2"
-                           Text="{Binding StatusMessage}"
-                           Style="{StaticResource CaptionTextStyle}"
-                           Margin="0,12,0,0"/>
+                <Border Grid.Row="2"
+                        Style="{StaticResource StatusChipStyle}"
+                        Background="{StaticResource SuccessTintBrush}"
+                        BorderBrush="{StaticResource SuccessBrush}"
+                        Margin="0,12,0,0">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE930;" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource SuccessBrush}" Margin="0,0,6,0"/>
+                        <TextBlock Text="{Binding StatusMessage}"
+                                   Style="{StaticResource StatusChipTextStyle}"
+                                   Foreground="{StaticResource SuccessBrush}"/>
+                    </StackPanel>
+                </Border>
             </Grid>
         </Border>
     </Grid>

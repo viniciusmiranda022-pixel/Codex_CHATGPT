@@ -33,15 +33,22 @@
                             <Border Style="{StaticResource CardStyle}" Margin="0,0,16,16">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="4"/>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding Title}" Style="{StaticResource CaptionTextStyle}"/>
-                                        <TextBlock Text="{Binding Value}" FontSize="24" FontWeight="SemiBold" Margin="0,6,0,0" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <Border Background="{StaticResource PrimaryBrush}" CornerRadius="4,0,0,4"/>
+                                    <StackPanel Grid.Column="1" Margin="14,0,0,0">
+                                        <TextBlock Text="{Binding Title}" Style="{StaticResource LabelTextStyle}"/>
+                                        <TextBlock Text="{Binding Value}" Style="{StaticResource MetricValueTextStyle}" Margin="0,6,0,0"/>
                                         <TextBlock Text="{Binding Subtext}" Style="{StaticResource CaptionTextStyle}" Margin="0,6,0,0"/>
                                     </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="{Binding Icon}" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="{StaticResource TextSecondaryBrush}" Margin="16,0,0,0"/>
+                                    <TextBlock Grid.Column="2"
+                                               Text="{Binding Icon}"
+                                               FontFamily="Segoe MDL2 Assets"
+                                               FontSize="20"
+                                               Foreground="{StaticResource PrimaryBrush}"
+                                               Margin="16,0,0,0"/>
                                 </Grid>
                             </Border>
                         </DataTemplate>
@@ -98,6 +105,26 @@
                         <StackPanel>
                             <TextBlock Text="Saúde do sistema" Style="{StaticResource SectionHeaderTextStyle}"/>
                             <TextBlock Text="Indicadores gerais do aplicativo." Style="{StaticResource SubtitleTextStyle}" Margin="0,6,0,0"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                <Border Style="{StaticResource StatusChipStyle}" Background="{StaticResource SuccessTintBrush}" BorderBrush="{StaticResource SuccessBrush}" Margin="0,0,8,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE930;" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource SuccessBrush}" Margin="0,0,6,0"/>
+                                        <TextBlock Text="Operacional" Style="{StaticResource StatusChipTextStyle}" Foreground="{StaticResource SuccessBrush}"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource StatusChipStyle}" Background="{StaticResource WarningTintBrush}" BorderBrush="{StaticResource WarningBrush}" Margin="0,0,8,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE7BA;" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource WarningBrush}" Margin="0,0,6,0"/>
+                                        <TextBlock Text="Atenção" Style="{StaticResource StatusChipTextStyle}" Foreground="{StaticResource WarningBrush}"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource StatusChipStyle}" Background="{StaticResource ErrorTintBrush}" BorderBrush="{StaticResource ErrorBrush}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE783;" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource ErrorBrush}" Margin="0,0,6,0"/>
+                                        <TextBlock Text="Incidente" Style="{StaticResource StatusChipTextStyle}" Foreground="{StaticResource ErrorBrush}"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
                             <StackPanel Margin="0,12,0,0">
                                 <TextBlock Text="Log atual" Style="{StaticResource CaptionTextStyle}"/>
                                 <TextBlock Text="{Binding LogFilePath}" TextWrapping="Wrap" Margin="0,4,0,12"/>

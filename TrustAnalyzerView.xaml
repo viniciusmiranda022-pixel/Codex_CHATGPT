@@ -58,7 +58,19 @@
                     <Button x:Name="ExportSqlButton" Content="Exportar SQL" Style="{StaticResource OutlineButtonStyle}" Click="ExportSql_Click" Margin="10,0,0,0" ToolTip="Exporta a lista atual para SQL."/>
                 </StackPanel>
 
-                <TextBlock Grid.Row="2" x:Name="StatusText" Text="✔️ Pronto para iniciar a coleta." Style="{StaticResource CaptionTextStyle}" Margin="0,12,0,0"/>
+                <Border Grid.Row="2"
+                        Style="{StaticResource StatusChipStyle}"
+                        Background="{StaticResource SuccessTintBrush}"
+                        BorderBrush="{StaticResource SuccessBrush}"
+                        Margin="0,12,0,0">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE930;" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource SuccessBrush}" Margin="0,0,6,0"/>
+                        <TextBlock x:Name="StatusText"
+                                   Text="✔️ Pronto para iniciar a coleta."
+                                   Style="{StaticResource StatusChipTextStyle}"
+                                   Foreground="{StaticResource SuccessBrush}"/>
+                    </StackPanel>
+                </Border>
             </Grid>
         </Border>
     </Grid>
