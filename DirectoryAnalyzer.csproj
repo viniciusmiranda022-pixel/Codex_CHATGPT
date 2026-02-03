@@ -24,6 +24,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="DirectoryAnalyzer.SmokeTests\**\*.cs" />
+    <EmbeddedResource Remove="DirectoryAnalyzer.SmokeTests\**\*" />
+    <None Remove="DirectoryAnalyzer.SmokeTests\**\*" />
+    <Page Remove="DirectoryAnalyzer.SmokeTests\**\*" />
+    <Resource Remove="DirectoryAnalyzer.SmokeTests\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="MahApps.Metro" Version="2.4.10" />
     <PackageReference Include="Microsoft.PowerShell.5.ReferenceAssemblies" Version="1.1.0" />
     <PackageReference Include="System.Data.SqlClient" Version="4.8.6" />
