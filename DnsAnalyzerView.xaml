@@ -1,4 +1,4 @@
-<UserControl x:Class="DirectoryAnalyzer.Views.DnsAnalyzerView"
+﻿<UserControl x:Class="DirectoryAnalyzer.Views.DnsAnalyzerView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="{StaticResource BackgroundBrush}">
@@ -10,7 +10,6 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
-<<<<<<< HEAD
         </Grid.RowDefinitions>
 
         <!-- Header -->
@@ -27,7 +26,7 @@
             </DockPanel>
         </Border>
 
-        <!-- Feedback de execução -->
+        <!-- Feedback de execuÃ§Ã£o -->
         <StackPanel Grid.Row="1" Margin="2,10,0,0">
             <ProgressBar IsIndeterminate="True"
                          Style="{StaticResource InlineProgressBarStyle}"
@@ -75,7 +74,6 @@
                            Style="{StaticResource CaptionTextStyle}"
                            Margin="0,12,0,0"/>
             </Grid>
-=======
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -120,7 +118,7 @@
             </TabControl>
         </Border>
 
-        <!-- Botões de Exportação -->
+        <!-- BotÃµes de ExportaÃ§Ã£o -->
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button Content="Exportar CSV" Style="{StaticResource OutlineButtonStyle}" Command="{Binding ExportCsvCommand}"/>
             <Button Content="Exportar XML" Style="{StaticResource OutlineButtonStyle}" Command="{Binding ExportXmlCommand}" Margin="10,0,0,0"/>
@@ -131,7 +129,6 @@
         <!-- Status -->
         <Border Grid.Row="4" Style="{StaticResource CardStyle}" Margin="0,16,0,0" Padding="12">
             <TextBlock x:Name="StatusText" Text="{Binding StatusMessage}" Style="{StaticResource CaptionTextStyle}"/>
->>>>>>> origin/main
         </Border>
     </Grid>
 </UserControl>
