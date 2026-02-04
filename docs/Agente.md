@@ -106,11 +106,12 @@ O agente viabiliza coleta remota em ambientes onde a estação do operador não 
 
 ## Configuração do agente
 ### Arquivo `agentsettings.json`
+* Local padrão: `%ProgramData%\DirectoryAnalyzerAgent\agentsettings.json`.
 * `BindPrefix` (default: `https://+:8443/agent/`)
 * `CertThumbprint`
 * `AnalyzerClientThumbprints` (allowlist)
 * `ActionTimeoutSeconds` (default 30)
-* `LogPath` (default `C:\ProgramData\DirectoryAnalyzer\agent.log`)
+* `LogPath` (default `%ProgramData%\DirectoryAnalyzerAgent\Logs\agent.log`)
 * `Domain` (se definido, força LDAP no domínio)
 * `MaxRequestBytes` (default 65536)
 * `RequestClockSkewSeconds` (default 300)
@@ -126,7 +127,7 @@ O agente viabiliza coleta remota em ambientes onde a estação do operador não 
 ### Registry overrides
 * `HKLM\SOFTWARE\DirectoryAnalyzer\Agent` (campos equivalentes).
 
-**Provas:** `ConfigLoader`.
+**Provas:** `AgentConfigLoader`.
 
 ## Instalação (MSI/WiX)
 * Instalador WiX: `Installer/Product.wxs`.
@@ -141,13 +142,13 @@ O agente viabiliza coleta remota em ambientes onde a estação do operador não 
 **Provas:** `Product.wxs` (CustomAction AddFirewallRule).
 
 ## Teste ponta-a-ponta
-### Opção 1 — AnalyzerClient
+### Opção 1: AnalyzerClient
 1. Configurar `agentclientsettings.json`.
 2. Executar `AnalyzerClient` e validar resposta.
 
 **Provas:** `AnalyzerClient/Program.cs`.
 
-### Opção 2 — UI WPF
+### Opção 2: UI WPF
 1. Habilitar Agent Mode.
 2. Abrir “Agent Inventory”.
 3. Executar consulta de usuários.

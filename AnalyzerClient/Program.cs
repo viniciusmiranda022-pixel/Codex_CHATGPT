@@ -10,6 +10,7 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using DirectoryAnalyzer.Agent.Contracts;
+using DirectoryAnalyzer.Agent.Contracts.Services;
 
 namespace DirectoryAnalyzer.AnalyzerClient
 {
@@ -19,6 +20,11 @@ namespace DirectoryAnalyzer.AnalyzerClient
         {
             try
             {
+                if (HasDoctorFlag(args))
+                {
+                    return RunDoctor();
+                }
+
                 return RunAsync().GetAwaiter().GetResult();
             }
             catch (Exception ex)
@@ -30,8 +36,13 @@ namespace DirectoryAnalyzer.AnalyzerClient
 
         private static async Task<int> RunAsync()
         {
-            var configPath = ResolveConfigPath("agentclientsettings.json");
-            var config = AnalyzerConfigLoader.Load(configPath);
+            var policy = new PathPolicy();
+            var resolver = new ConfigurationResolver(policy);
+            var resolution = resolver.ResolveAnalyzerClientConfig();
+            var logger = new DiagnosticLogger(resolution.LogPath);
+            LogResolution(logger, resolution);
+
+            var config = AnalyzerConfigLoader.Load(resolution.SelectedPath);
 
             System.Net.ServicePointManager.SecurityProtocol = System.Net.SecurityProtocolType.Tls12;
 
@@ -85,16 +96,105 @@ namespace DirectoryAnalyzer.AnalyzerClient
             return 0;
         }
 
-        private static string ResolveConfigPath(string fileName)
+        private static int RunDoctor()
         {
-            var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-            var sharedPath = Path.Combine(programData, "DirectoryAnalyzer", fileName);
-            if (File.Exists(sharedPath))
+            var policy = new PathPolicy();
+            var resolver = new ConfigurationResolver(policy);
+            var resolution = resolver.ResolveAnalyzerClientConfig();
+            var logger = new DiagnosticLogger(resolution.LogPath);
+            var failures = 0;
+
+            WriteDiagnostic(logger, $"Modo doctor iniciado. Config path resolvido: {resolution.SelectedPath}");
+            WriteDiagnostic(logger, $"Log path: {resolution.LogPath}");
+            WriteDiagnostic(logger, $"Precedência: {string.Join(", ", resolution.PrecedenceOrder)}. Fonte: {resolution.Source}.");
+            if (!string.IsNullOrWhiteSpace(resolution.MigrationDetails))
             {
-                return sharedPath;
+                WriteDiagnostic(logger, resolution.MigrationDetails);
             }
 
-            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, fileName);
+            if (!ValidateLogPath(resolution.LogPath, logger))
+            {
+                failures++;
+            }
+
+            if (!AnalyzerConfigLoader.TryLoad(resolution.SelectedPath, out var config, out var error))
+            {
+                failures++;
+                WriteDiagnostic(logger, $"Falha ao ler JSON de config em {resolution.SelectedPath}. Erro: {error}");
+                return 1;
+            }
+
+            var validationErrors = AnalyzerConfigValidator.Validate(config);
+            if (validationErrors.Count > 0)
+            {
+                failures++;
+                WriteDiagnostic(logger, $"Campos obrigatórios ausentes ou inválidos: {string.Join("; ", validationErrors)}");
+            }
+
+            WriteDiagnostic(logger, failures == 0 ? "Doctor concluído com sucesso." : "Doctor concluiu com falhas.");
+            return failures == 0 ? 0 : 1;
+        }
+
+        private static void LogResolution(DiagnosticLogger logger, ConfigurationResolutionResult resolution)
+        {
+            if (logger == null)
+            {
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(resolution.MigrationDetails))
+            {
+                logger.Write(resolution.MigrationDetails);
+            }
+
+            logger.Write($"Config path: {resolution.SelectedPath}. Fonte: {resolution.Source}.");
+        }
+
+        private static bool HasDoctorFlag(string[] args)
+        {
+            if (args == null)
+            {
+                return false;
+            }
+
+            foreach (var arg in args)
+            {
+                if (string.Equals(arg, "--doctor", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static void WriteDiagnostic(DiagnosticLogger logger, string message)
+        {
+            Console.WriteLine(message);
+            logger?.Write(message);
+        }
+
+        private static bool ValidateLogPath(string logPath, DiagnosticLogger logger)
+        {
+            try
+            {
+                var directory = Path.GetDirectoryName(logPath);
+                if (!string.IsNullOrWhiteSpace(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                var testFile = Path.Combine(directory ?? AppDomain.CurrentDomain.BaseDirectory, $"doctor_{Guid.NewGuid():N}.tmp");
+                File.WriteAllText(testFile, "ok");
+                File.Delete(testFile);
+                WriteDiagnostic(logger, "Validação de escrita no diretório de log concluída.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                WriteDiagnostic(logger, $"Falha ao validar escrita no diretório de log. Erro: {ex.Message}");
+                return false;
+            }
         }
 
         private static X509Certificate2 FindCertificate(string thumbprint)

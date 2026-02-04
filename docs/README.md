@@ -1,4 +1,7 @@
-# DirectoryAnalyzer — Documentação Oficial (PT-BR)
+# DirectoryAnalyzer: Documentação Oficial (PT-BR)
+
+## Entrada oficial
+Use `DOCS/01_OVERVIEW.md` como ponto de entrada da documentação consolidada.
 
 ## Finalidade
 Este documento fornece a visão executiva e o ponto de entrada para o uso do DirectoryAnalyzer, descrevendo **o que existe de fato no repositório**, como compilar e executar e onde validar cada componente. Toda afirmação relevante aponta para código-fonte existente.
@@ -55,8 +58,8 @@ msbuild .\DirectoryAnalyzer.sln /t:Restore,Build /p:Configuration=Debug
 * Agente e contratos: `AgentHost`, `ActionRegistry`, `AgentContracts`.
 
 ## LIMITAÇÕES ATUAIS
-* **Desalinhamento de path de configuração do agente:** o instalador grava `agentsettings.json` em `%ProgramData%\DirectoryAnalyzerAgent`, enquanto o agente padrão busca em `%ProgramData%\DirectoryAnalyzer`. (Ver `Installer/Product.wxs` e `AgentHost/Program.cs` nos projetos de agente.)
 * **UI do Agent Inventory expõe apenas `GetUsers`:** as demais ações do agente não estão ligadas a views na UI.
+* **`TrustedCaThumbprints` não é consumido pelo agente:** o instalador grava o campo no JSON e no registry, mas o `AgentConfig` não possui essa propriedade e o host não valida CA allowlist.
 
 ## COMO VALIDAR
 1. **Compilar** a solução (Visual Studio ou `msbuild`).

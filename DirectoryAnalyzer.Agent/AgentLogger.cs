@@ -34,7 +34,15 @@ namespace DirectoryAnalyzer.Agent
             }
         }
 
-        public static AgentLogEntry Create(string requestId, string actionName, string clientThumbprint, string clientSubject, long durationMs, string status, string errorCode)
+        public static AgentLogEntry Create(
+            string requestId,
+            string actionName,
+            string clientThumbprint,
+            string clientSubject,
+            long durationMs,
+            string status,
+            string errorCode,
+            string message = null)
         {
             return new AgentLogEntry
             {
@@ -45,7 +53,8 @@ namespace DirectoryAnalyzer.Agent
                 ClientSubject = clientSubject,
                 DurationMs = durationMs,
                 Status = status,
-                ErrorCode = errorCode
+                ErrorCode = errorCode,
+                Message = message
             };
         }
     }
@@ -76,5 +85,8 @@ namespace DirectoryAnalyzer.Agent
 
         [System.Runtime.Serialization.DataMember(Order = 8, EmitDefaultValue = false)]
         public string ErrorCode { get; set; }
+
+        [System.Runtime.Serialization.DataMember(Order = 9, EmitDefaultValue = false)]
+        public string Message { get; set; }
     }
 }

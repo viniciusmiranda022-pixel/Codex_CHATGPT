@@ -90,7 +90,7 @@ public sealed class AgentConfig
     public string CertThumbprint { get; set; } = string.Empty;
     public string[] AnalyzerClientThumbprints { get; set; } = Array.Empty<string>();
     public int ActionTimeoutSeconds { get; set; } = 30;
-    public string LogPath { get; set; } = @"C:\ProgramData\DirectoryAnalyzer\agent.log";
+    public string LogPath { get; set; } = @"%ProgramData%\DirectoryAnalyzerAgent\Logs\agent.log";
     public int MaxRequestBytes { get; set; } = 65536;
     public int RequestClockSkewSeconds { get; set; } = 300;
     public int ReplayCacheMinutes { get; set; } = 10;
@@ -101,7 +101,7 @@ public sealed class AgentConfig
 
 }
 
-public static class ConfigLoader
+public static class AgentConfigLoader
 {
     public static AgentConfig Load(string path)
     {
@@ -140,7 +140,7 @@ public sealed class AgentHost
 
     public async Task StartAsync(CancellationToken token)
     {
-        _config = ConfigLoader.Load(@"C:\ProgramData\DirectoryAnalyzer\agentsettings.json");
+        _config = AgentConfigLoader.Load(@"%ProgramData%\DirectoryAnalyzerAgent\agentsettings.json");
         _registry = new ActionRegistry();
 
         _listener.Prefixes.Add(_config.BindPrefix);
@@ -462,7 +462,7 @@ public async Task<AgentResponse> ExecuteAsync(AgentRequest request, AgentConfig 
 ```
 
 **Log storage**
-* `C:\ProgramData\DirectoryAnalyzer\agent.log` with log rotation (daily + size caps).  
+* `%ProgramData%\DirectoryAnalyzerAgent\Logs\agent.log` with log rotation (daily + size caps).  
 
 ---
 
@@ -557,7 +557,7 @@ public sealed class AgentClient
 1. **Install agent binaries** to `C:\Program Files\DirectoryAnalyzer\Agent`.  
 2. **Create service account or gMSA** with read-only AD permissions.  
 3. **Install agent certificate** (LocalMachine\My) and bind HTTPS port.  
-4. **Configure agent JSON** at `C:\ProgramData\DirectoryAnalyzer\agentsettings.json`.  
+4. **Configure agent JSON** at `%ProgramData%\DirectoryAnalyzerAgent\agentsettings.json`.  
 5. **Install Windows Service**:
    ```powershell
    sc.exe create DirectoryAnalyzerAgent binPath= "C:\Program Files\DirectoryAnalyzer\Agent\DirectoryAnalyzer.Agent.exe"
@@ -566,7 +566,7 @@ public sealed class AgentClient
    ```
 6. **Open firewall port** for TCP 8443 inbound from Analyzer subnet only.  
 7. **Install Analyzer client certificate** on Analyzer and configure allow-list in Analyzer config.  
-8. **Configure analyzer client JSON** at `C:\ProgramData\DirectoryAnalyzer\agentclientsettings.json`.  
+8. **Configure analyzer client JSON** at `%ProgramData%\DirectoryAnalyzerAgent\agentclientsettings.json`.  
 9. **Validate** by sending a `GetUsers` request from Analyzer UI.  
 
 ---
@@ -654,7 +654,7 @@ msiexec /i Installer\\bin\\Release\\DirectoryAnalyzer.Agent.msi /qn \\
 ## 15. WPF Integration (DirectoryAnalyzer UI)
 
 * The WPF app includes an **Agent Inventory** module that calls the agent via mTLS.  
-* The UI reads configuration from `C:\\ProgramData\\DirectoryAnalyzer\\agentclientsettings.json`.  
+* The UI reads configuration from `%ProgramData%\DirectoryAnalyzerAgent\agentclientsettings.json`.  
 * The `GetUsers` action is executed through the agent and results are displayed in the DataGrid.  
 
 ---

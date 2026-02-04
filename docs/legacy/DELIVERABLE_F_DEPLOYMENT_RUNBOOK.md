@@ -111,7 +111,7 @@ netsh http show sslcert ipport=0.0.0.0:$Port
 > Use this if you are **self-hosting** the agent without HTTP.SYS.
 
 ```json
-// C:\ProgramData\DirectoryAnalyzer\agentsettings.json
+// %ProgramData%\DirectoryAnalyzerAgent\agentsettings.json
 {
   "Urls": "https://+:8443/agent/",
   "Kestrel": {

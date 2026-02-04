@@ -13,21 +13,21 @@ Definir termos técnicos usados na documentação e no código.
 * Termos de agente e contratos: `DirectoryAnalyzer.Agent.Contracts/AgentContracts.cs`.
 * Termos WinRM/CIM: módulos PowerShell nos `*.xaml.cs`.
 
-**Agente** — Serviço/console que expõe API HTTPS para coleta AD.
+**Agente**: Serviço/console que expõe API HTTPS para coleta AD.
 
-**mTLS** — Mutual TLS; cliente e servidor apresentam certificados.
+**mTLS**: Mutual TLS; cliente e servidor apresentam certificados.
 
-**Thumbprint** — Hash do certificado usado para allowlist/pinning.
+**Thumbprint**: Hash do certificado usado para allowlist/pinning.
 
-**Nonce** — Valor único por request, usado para anti-replay.
+**Nonce**: Valor único por request, usado para anti-replay.
 
-**WinRM** — Windows Remote Management (Invoke-Command remoto).
+**WinRM**: Windows Remote Management (Invoke-Command remoto).
 
-**CIM/WMI** — Interface de gerenciamento do Windows para inventário.
+**CIM/WMI**: Interface de gerenciamento do Windows para inventário.
 
-**GPO** — Group Policy Object.
+**GPO**: Group Policy Object.
 
-**PDC** — Primary Domain Controller.
+**PDC**: Primary Domain Controller.
 
 ## LIMITAÇÕES ATUAIS
 * Nenhuma específica (definições diretas).

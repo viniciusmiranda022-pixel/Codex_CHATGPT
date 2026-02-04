@@ -14,22 +14,20 @@ namespace DirectoryAnalyzer.Agent
     public sealed class AgentHost
     {
         private readonly HttpListener _listener = new HttpListener();
-        private readonly string _configPath;
-        private AgentConfig _config;
+        private readonly AgentConfig _config;
         private ActionRegistry _registry;
         private AgentLogger _logger;
         private SlidingWindowRateLimiter _rateLimiter;
         private NonceCache _nonceCache;
         private SemaphoreSlim _concurrencyLimiter;
 
-        public AgentHost(string configPath)
+        public AgentHost(AgentConfig config)
         {
-            _configPath = configPath;
+            _config = config ?? throw new ArgumentNullException(nameof(config));
         }
 
         public async Task StartAsync(CancellationToken token)
         {
-            _config = ConfigLoader.Load(_configPath);
             _registry = new ActionRegistry();
             _logger = new AgentLogger(_config.LogPath);
             _rateLimiter = new SlidingWindowRateLimiter(

@@ -6,13 +6,13 @@ namespace DirectoryAnalyzer.Agent
 {
     public sealed class InventoryAgentService : ServiceBase
     {
-        private readonly string _configPath;
+        private readonly AgentConfig _config;
         private CancellationTokenSource _cts;
         private AgentHost _host;
 
-        public InventoryAgentService(string configPath)
+        public InventoryAgentService(AgentConfig config)
         {
-            _configPath = configPath;
+            _config = config;
             ServiceName = "DirectoryAnalyzerAgent";
             CanStop = true;
             CanPauseAndContinue = false;
@@ -22,7 +22,7 @@ namespace DirectoryAnalyzer.Agent
         protected override void OnStart(string[] args)
         {
             _cts = new CancellationTokenSource();
-            _host = new AgentHost(_configPath);
+            _host = new AgentHost(_config);
             _ = Task.Run(() => _host.StartAsync(_cts.Token));
         }
 
