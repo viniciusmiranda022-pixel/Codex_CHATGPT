@@ -17,11 +17,9 @@ namespace DirectoryAnalyzer.Views
 {
     public partial class ScheduledTasksAnalyzerView : UserControl
     {
- codex/transform-product-to-agent-only-architecture-xaez7h
         private readonly ModuleCollectionService _collectionService;
 
         private readonly BrokerJobService _brokerJobService;
- main
         private const string ModuleName = "ScheduledTasksAnalyzer";
         private readonly ILogService _logService;
 
@@ -29,11 +27,9 @@ namespace DirectoryAnalyzer.Views
         {
             InitializeComponent();
             var settings = BrokerClientSettingsLoader.Load(BrokerClientSettingsStore.ResolvePath());
- codex/transform-product-to-agent-only-architecture-xaez7h
             _collectionService = new ModuleCollectionService(new BrokerJobService(settings));
 
             _brokerJobService = new BrokerJobService(settings);
- main
             _logService = LogService.CreateLogger(ModuleName);
             UpdateStatus("✔️ Pronto para iniciar a coleta.", "Pronto");
             SetBusyState(false);
@@ -67,11 +63,6 @@ namespace DirectoryAnalyzer.Views
 
             try
             {
- codex/transform-product-to-agent-only-architecture-xaez7h
-                var moduleResult = await _collectionService.RunScheduledTasksAsync(
-                    scopeAttribute,
-                    scopeValue,
-
                 // SCRIPT ATUALIZADO PARA EXECUÇÃO REMOTA
                 string scriptText = @"
                     param([string]$AttributeName, [string]$AttributeValue)
@@ -120,7 +111,6 @@ namespace DirectoryAnalyzer.Views
                     ModuleName,
                     scriptText,
                     scriptParameters,
- main
                     Environment.UserName,
                     CancellationToken.None);
 

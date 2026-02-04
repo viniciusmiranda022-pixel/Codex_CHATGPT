@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
@@ -42,30 +43,35 @@ namespace DirectoryAnalyzer.Services
             return await GetResultAsync(client, status.JobId, token).ConfigureAwait(false);
         }
 
- codex/transform-product-to-agent-only-architecture-xaez7h
         public Task<ModuleResult> RunModuleAsync(string moduleName, IDictionary<string, string> parameters, string requestedBy, CancellationToken token)
-
-        public Task<ModuleResult> RunPowerShellScriptAsync(string moduleName, string scriptText, IDictionary<string, string> parameters, string requestedBy, CancellationToken token)
- main
         {
             var request = new JobRequest
             {
                 CorrelationId = Guid.NewGuid().ToString("N"),
- codex/transform-product-to-agent-only-architecture-xaez7h
                 ModuleName = moduleName,
+                RequestedBy = requestedBy,
+                Parameters = parameters == null
+                    ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    : new Dictionary<string, string>(parameters, StringComparer.OrdinalIgnoreCase)
+            };
 
+            return RunJobAsync(request, token);
+        }
+
+        public Task<ModuleResult> RunPowerShellScriptAsync(string moduleName, string scriptText, IDictionary<string, string> parameters, string requestedBy, CancellationToken token)
+        {
+            var request = new JobRequest
+            {
+                CorrelationId = Guid.NewGuid().ToString("N"),
                 ModuleName = "RunPowerShellScript",
- main
                 RequestedBy = requestedBy,
                 Parameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             };
 
- codex/transform-product-to-agent-only-architecture-xaez7h
 
             request.Parameters["Script"] = scriptText ?? string.Empty;
             request.Parameters["ModuleName"] = moduleName ?? string.Empty;
 
- main
             if (parameters != null)
             {
                 foreach (var pair in parameters)
