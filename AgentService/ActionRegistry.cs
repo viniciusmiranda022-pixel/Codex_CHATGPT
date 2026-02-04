@@ -5,7 +5,7 @@ using System.Security.Principal;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using DirectoryAnalyzer.AgentContracts;
+using DirectoryAnalyzer.Agent.Contracts;
 
 namespace DirectoryAnalyzer.Agent
 {

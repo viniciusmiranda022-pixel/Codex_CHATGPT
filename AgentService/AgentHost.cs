@@ -7,7 +7,7 @@ using System.Runtime.Serialization.Json;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
-using DirectoryAnalyzer.AgentContracts;
+using DirectoryAnalyzer.Agent.Contracts;
 
 namespace DirectoryAnalyzer.Agent
 {
