@@ -32,7 +32,12 @@ namespace DirectoryAnalyzer.Agent
             _config = ConfigLoader.Load(_configPath);
             _registry = new ActionRegistry();
             _logger = new AgentLogger(_config.LogPath);
-            _rateLimiter = new SlidingWindowRateLimiter(_config.MaxRequestsPerMinute, TimeSpan.FromMinutes(1));
+            _rateLimiter = new SlidingWindowRateLimiter(
+                _config.MaxRequestsPerMinute,
+                TimeSpan.FromMinutes(1),
+                _config.MaxBurstRequests,
+                TimeSpan.FromSeconds(_config.BurstWindowSeconds),
+                TimeSpan.FromSeconds(_config.RateLimitBackoffSeconds));
             _nonceCache = new NonceCache(TimeSpan.FromMinutes(_config.ReplayCacheMinutes));
             _concurrencyLimiter = _config.MaxConcurrentRequests > 0
                 ? new SemaphoreSlim(_config.MaxConcurrentRequests, _config.MaxConcurrentRequests)
@@ -142,11 +147,22 @@ namespace DirectoryAnalyzer.Agent
                 clientThumbprint = clientCert.GetCertHashString();
                 clientSubject = clientCert.Subject;
 
-                if (!_rateLimiter.TryAcquire(clientThumbprint))
+                var rateResult = _rateLimiter.TryAcquire(clientThumbprint);
+                if (!rateResult.Allowed)
                 {
                     errorCode = "RateLimited";
                     context.Response.StatusCode = (int)HttpStatusCode.TooManyRequests;
-                    await WriteResponseAsync(context, AgentResponse.Failed("", "RateLimited", "Request rate exceeded."))
+                    if (rateResult.RetryAfterSeconds > 0)
+                    {
+                        context.Response.Headers["Retry-After"] = rateResult.RetryAfterSeconds.ToString();
+                    }
+
+                    await WriteResponseAsync(
+                            context,
+                            AgentResponse.Failed(
+                                "",
+                                "RateLimited",
+                                $"Request rate exceeded. Retry after {Math.Max(rateResult.RetryAfterSeconds, 1)} seconds."))
                         .ConfigureAwait(false);
                     return;
                 }
@@ -173,7 +189,7 @@ namespace DirectoryAnalyzer.Agent
                     return;
                 }
 
-                if (!ValidateAntiReplay(request, out var replayError))
+                if (!ValidateAntiReplay(request, clientThumbprint, out var replayError))
                 {
                     errorCode = replayError;
                     context.Response.StatusCode = (int)HttpStatusCode.Conflict;
@@ -242,18 +258,23 @@ namespace DirectoryAnalyzer.Agent
                 return null;
             }
 
-            if (_config.EnforceRevocationCheck && !ValidateCertificateChain(cert))
+            if (!ValidateCertificateChain(cert, _config.EnforceRevocationCheck, _config.FailOpenOnRevocation, out var warning))
             {
                 return null;
+            }
+
+            if (!string.IsNullOrWhiteSpace(warning))
+            {
+                _logger.Write(AgentLogger.Create(string.Empty, string.Empty, thumbprint, cert.Subject, 0, "Warning", warning));
             }
 
             return cert;
         }
 
-        private bool ValidateAntiReplay(AgentRequest request, out string error)
+        private bool ValidateAntiReplay(AgentRequest request, string clientThumbprint, out string error)
         {
             error = string.Empty;
-            if (request.TimestampUnixSeconds <= 0 || string.IsNullOrWhiteSpace(request.Nonce))
+            if (request.TimestampUnixSeconds <= 0 || string.IsNullOrWhiteSpace(request.Nonce) || string.IsNullOrWhiteSpace(request.CorrelationId))
             {
                 error = "ReplayMetadataMissing";
                 return false;
@@ -267,7 +288,7 @@ namespace DirectoryAnalyzer.Agent
                 return false;
             }
 
-            if (!_nonceCache.TryAdd(request.Nonce, requestTime))
+            if (!_nonceCache.TryAdd(clientThumbprint, request.Nonce, requestTime))
             {
                 error = "ReplayDetected";
                 return false;
@@ -276,14 +297,50 @@ namespace DirectoryAnalyzer.Agent
             return true;
         }
 
-        private static bool ValidateCertificateChain(X509Certificate2 cert)
+        private static bool ValidateCertificateChain(
+            X509Certificate2 cert,
+            bool enforceRevocation,
+            bool failOpenOnRevocation,
+            out string warning)
         {
+            warning = string.Empty;
             using var chain = new X509Chain();
-            chain.ChainPolicy.RevocationMode = X509RevocationMode.Online;
+            chain.ChainPolicy.RevocationMode = enforceRevocation ? X509RevocationMode.Online : X509RevocationMode.NoCheck;
             chain.ChainPolicy.RevocationFlag = X509RevocationFlag.EntireChain;
             chain.ChainPolicy.UrlRetrievalTimeout = TimeSpan.FromSeconds(10);
             chain.ChainPolicy.VerificationFlags = X509VerificationFlags.NoFlag;
-            return chain.Build(cert);
+            var valid = chain.Build(cert);
+            if (valid)
+            {
+                return true;
+            }
+
+            if (failOpenOnRevocation && IsRevocationOnly(chain.ChainStatus))
+            {
+                warning = "Revocation status could not be verified; fail-open enabled.";
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsRevocationOnly(X509ChainStatus[] statuses)
+        {
+            if (statuses == null || statuses.Length == 0)
+            {
+                return false;
+            }
+
+            foreach (var status in statuses)
+            {
+                if (status.Status != X509ChainStatusFlags.RevocationStatusUnknown
+                    && status.Status != X509ChainStatusFlags.OfflineRevocation)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private static void EnsureSecurePrefix(string prefix)
@@ -354,9 +411,10 @@ namespace DirectoryAnalyzer.Agent
             _expiration = expiration;
         }
 
-        public bool TryAdd(string nonce, DateTimeOffset timestamp)
+        public bool TryAdd(string clientThumbprint, string nonce, DateTimeOffset timestamp)
         {
-            if (!_entries.TryAdd(nonce, timestamp))
+            var key = $"{clientThumbprint ?? string.Empty}:{nonce}";
+            if (!_entries.TryAdd(key, timestamp))
             {
                 return false;
             }
@@ -389,40 +447,88 @@ namespace DirectoryAnalyzer.Agent
     {
         private readonly int _maxRequests;
         private readonly TimeSpan _window;
-        private readonly ConcurrentDictionary<string, Queue<DateTimeOffset>> _requests =
-            new ConcurrentDictionary<string, Queue<DateTimeOffset>>(StringComparer.OrdinalIgnoreCase);
+        private readonly int _burstLimit;
+        private readonly TimeSpan _burstWindow;
+        private readonly TimeSpan _backoff;
+        private readonly ConcurrentDictionary<string, RateLimitState> _requests =
+            new ConcurrentDictionary<string, RateLimitState>(StringComparer.OrdinalIgnoreCase);
 
-        public SlidingWindowRateLimiter(int maxRequests, TimeSpan window)
+        public SlidingWindowRateLimiter(int maxRequests, TimeSpan window, int burstLimit, TimeSpan burstWindow, TimeSpan backoff)
         {
             _maxRequests = maxRequests;
             _window = window;
+            _burstLimit = burstLimit;
+            _burstWindow = burstWindow;
+            _backoff = backoff;
         }
 
-        public bool TryAcquire(string key)
+        public RateLimitResult TryAcquire(string key)
         {
-            if (_maxRequests <= 0)
+            if (_maxRequests <= 0 && _burstLimit <= 0)
             {
-                return true;
+                return RateLimitResult.Allowed();
             }
 
-            var bucket = _requests.GetOrAdd(key ?? string.Empty, _ => new Queue<DateTimeOffset>());
+            var bucket = _requests.GetOrAdd(key ?? string.Empty, _ => new RateLimitState());
             var now = DateTimeOffset.UtcNow;
 
             lock (bucket)
             {
-                while (bucket.Count > 0 && now - bucket.Peek() > _window)
+                if (bucket.BackoffUntil > now)
                 {
-                    bucket.Dequeue();
+                    return RateLimitResult.Throttled((int)Math.Ceiling((bucket.BackoffUntil - now).TotalSeconds));
                 }
 
-                if (bucket.Count >= _maxRequests)
+                while (bucket.WindowRequests.Count > 0 && now - bucket.WindowRequests.Peek() > _window)
                 {
-                    return false;
+                    bucket.WindowRequests.Dequeue();
                 }
 
-                bucket.Enqueue(now);
-                return true;
+                while (bucket.BurstRequests.Count > 0 && now - bucket.BurstRequests.Peek() > _burstWindow)
+                {
+                    bucket.BurstRequests.Dequeue();
+                }
+
+                if (_maxRequests > 0 && bucket.WindowRequests.Count >= _maxRequests)
+                {
+                    bucket.BackoffUntil = now.Add(_backoff);
+                    return RateLimitResult.Throttled((int)Math.Ceiling(_backoff.TotalSeconds));
+                }
+
+                if (_burstLimit > 0 && bucket.BurstRequests.Count >= _burstLimit)
+                {
+                    bucket.BackoffUntil = now.Add(_backoff);
+                    return RateLimitResult.Throttled((int)Math.Ceiling(_backoff.TotalSeconds));
+                }
+
+                bucket.WindowRequests.Enqueue(now);
+                bucket.BurstRequests.Enqueue(now);
+                return RateLimitResult.Allowed();
             }
         }
+    }
+
+    internal sealed class RateLimitState
+    {
+        public Queue<DateTimeOffset> WindowRequests { get; } = new Queue<DateTimeOffset>();
+        public Queue<DateTimeOffset> BurstRequests { get; } = new Queue<DateTimeOffset>();
+        public DateTimeOffset BackoffUntil { get; set; }
+    }
+
+    internal readonly struct RateLimitResult
+    {
+        public bool Allowed { get; }
+        public int RetryAfterSeconds { get; }
+
+        private RateLimitResult(bool allowed, int retryAfterSeconds)
+        {
+            Allowed = allowed;
+            RetryAfterSeconds = retryAfterSeconds;
+        }
+
+        public static RateLimitResult Allowed() => new RateLimitResult(true, 0);
+
+        public static RateLimitResult Throttled(int retryAfterSeconds) =>
+            new RateLimitResult(false, Math.Max(retryAfterSeconds, 0));
     }
 }

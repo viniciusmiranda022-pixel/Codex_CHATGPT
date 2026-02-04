@@ -19,6 +19,12 @@ namespace DirectoryAnalyzer.Services
 
         [DataMember(Order = 4)]
         public int RequestTimeoutSeconds { get; set; } = 30;
+
+        [DataMember(Order = 5)]
+        public bool EnforceRevocationCheck { get; set; } = true;
+
+        [DataMember(Order = 6)]
+        public bool FailOpenOnRevocation { get; set; } = false;
     }
 
     public static class AgentClientSettingsLoader
