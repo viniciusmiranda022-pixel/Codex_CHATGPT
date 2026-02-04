@@ -1,0 +1,8 @@
+{
+  "AgentEndpoint": "https://agent01.contoso.local:8443/agent/",
+  "ClientCertThumbprint": "REPLACE_WITH_ANALYZER_CLIENT_CERT_THUMBPRINT",
+  "AllowedAgentThumbprints": [
+    "REPLACE_WITH_AGENT_CERT_THUMBPRINT"
+  ],
+  "RequestTimeoutSeconds": 30
+}
