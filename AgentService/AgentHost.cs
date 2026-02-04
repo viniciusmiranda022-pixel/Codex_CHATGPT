@@ -466,7 +466,7 @@ namespace DirectoryAnalyzer.Agent
         {
             if (_maxRequests <= 0 && _burstLimit <= 0)
             {
-                return RateLimitResult.Allowed();
+                return RateLimitResult.CreateAllowed();
             }
 
             var bucket = _requests.GetOrAdd(key ?? string.Empty, _ => new RateLimitState());
@@ -476,7 +476,7 @@ namespace DirectoryAnalyzer.Agent
             {
                 if (bucket.BackoffUntil > now)
                 {
-                    return RateLimitResult.Throttled((int)Math.Ceiling((bucket.BackoffUntil - now).TotalSeconds));
+                    return RateLimitResult.CreateThrottled((int)Math.Ceiling((bucket.BackoffUntil - now).TotalSeconds));
                 }
 
                 while (bucket.WindowRequests.Count > 0 && now - bucket.WindowRequests.Peek() > _window)
@@ -492,18 +492,18 @@ namespace DirectoryAnalyzer.Agent
                 if (_maxRequests > 0 && bucket.WindowRequests.Count >= _maxRequests)
                 {
                     bucket.BackoffUntil = now.Add(_backoff);
-                    return RateLimitResult.Throttled((int)Math.Ceiling(_backoff.TotalSeconds));
+                    return RateLimitResult.CreateThrottled((int)Math.Ceiling(_backoff.TotalSeconds));
                 }
 
                 if (_burstLimit > 0 && bucket.BurstRequests.Count >= _burstLimit)
                 {
                     bucket.BackoffUntil = now.Add(_backoff);
-                    return RateLimitResult.Throttled((int)Math.Ceiling(_backoff.TotalSeconds));
+                    return RateLimitResult.CreateThrottled((int)Math.Ceiling(_backoff.TotalSeconds));
                 }
 
                 bucket.WindowRequests.Enqueue(now);
                 bucket.BurstRequests.Enqueue(now);
-                return RateLimitResult.Allowed();
+                return RateLimitResult.CreateAllowed();
             }
         }
     }
@@ -526,9 +526,9 @@ namespace DirectoryAnalyzer.Agent
             RetryAfterSeconds = retryAfterSeconds;
         }
 
-        public static RateLimitResult Allowed() => new RateLimitResult(true, 0);
+        public static RateLimitResult CreateAllowed() => new RateLimitResult(true, 0);
 
-        public static RateLimitResult Throttled(int retryAfterSeconds) =>
+        public static RateLimitResult CreateThrottled(int retryAfterSeconds) =>
             new RateLimitResult(false, Math.Max(retryAfterSeconds, 0));
     }
 }
