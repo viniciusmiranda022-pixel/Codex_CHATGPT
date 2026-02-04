@@ -34,7 +34,7 @@ namespace DirectoryAnalyzer.Agent
             }
         }
 
-        public static AgentLogEntry Create(string requestId, string actionName, string clientThumbprint, long durationMs, string status, string errorCode)
+        public static AgentLogEntry Create(string requestId, string actionName, string clientThumbprint, string clientSubject, long durationMs, string status, string errorCode)
         {
             return new AgentLogEntry
             {
@@ -42,6 +42,7 @@ namespace DirectoryAnalyzer.Agent
                 RequestId = requestId,
                 ActionName = actionName,
                 ClientThumbprint = clientThumbprint,
+                ClientSubject = clientSubject,
                 DurationMs = durationMs,
                 Status = status,
                 ErrorCode = errorCode
@@ -65,12 +66,15 @@ namespace DirectoryAnalyzer.Agent
         public string ClientThumbprint { get; set; }
 
         [System.Runtime.Serialization.DataMember(Order = 5)]
-        public long DurationMs { get; set; }
+        public string ClientSubject { get; set; }
 
         [System.Runtime.Serialization.DataMember(Order = 6)]
+        public long DurationMs { get; set; }
+
+        [System.Runtime.Serialization.DataMember(Order = 7)]
         public string Status { get; set; }
 
-        [System.Runtime.Serialization.DataMember(Order = 7, EmitDefaultValue = false)]
+        [System.Runtime.Serialization.DataMember(Order = 8, EmitDefaultValue = false)]
         public string ErrorCode { get; set; }
     }
 }

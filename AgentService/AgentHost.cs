@@ -1,17 +1,13 @@
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Runtime.Serialization.Json;
 using System.Security.Cryptography.X509Certificates;
- codex/design-production-grade-on-premises-agent-architecture-mn24bx
 using System.Threading;
 using System.Threading.Tasks;
 using DirectoryAnalyzer.AgentContracts;
-
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
- main
 
 namespace DirectoryAnalyzer.Agent
 {
@@ -22,6 +18,9 @@ namespace DirectoryAnalyzer.Agent
         private AgentConfig _config;
         private ActionRegistry _registry;
         private AgentLogger _logger;
+        private SlidingWindowRateLimiter _rateLimiter;
+        private NonceCache _nonceCache;
+        private SemaphoreSlim _concurrencyLimiter;
 
         public AgentHost(string configPath)
         {
@@ -33,21 +32,22 @@ namespace DirectoryAnalyzer.Agent
             _config = ConfigLoader.Load(_configPath);
             _registry = new ActionRegistry();
             _logger = new AgentLogger(_config.LogPath);
+            _rateLimiter = new SlidingWindowRateLimiter(_config.MaxRequestsPerMinute, TimeSpan.FromMinutes(1));
+            _nonceCache = new NonceCache(TimeSpan.FromMinutes(_config.ReplayCacheMinutes));
+            _concurrencyLimiter = _config.MaxConcurrentRequests > 0
+                ? new SemaphoreSlim(_config.MaxConcurrentRequests, _config.MaxConcurrentRequests)
+                : new SemaphoreSlim(int.MaxValue, int.MaxValue);
 
- codex/design-production-grade-on-premises-agent-architecture-mn24bx
             EnsureSecurePrefix(_config.BindPrefix);
             EnsureServerCertificateAvailable(_config.CertThumbprint);
             EnsureClientAllowList(_config.AnalyzerClientThumbprints);
 
-
- main
             _listener.Prefixes.Clear();
             _listener.Prefixes.Add(_config.BindPrefix);
             _listener.Start();
 
             while (!token.IsCancellationRequested)
             {
- codex/design-production-grade-on-premises-agent-architecture-mn24bx
                 try
                 {
                     var context = await _listener.GetContextAsync().ConfigureAwait(false);
@@ -57,10 +57,10 @@ namespace DirectoryAnalyzer.Agent
                 {
                     break;
                 }
-
-                var context = await _listener.GetContextAsync().ConfigureAwait(false);
-                _ = Task.Run(() => HandleRequestAsync(context, token), token);
- main
+                catch (ObjectDisposedException)
+                {
+                    break;
+                }
             }
         }
 
@@ -78,20 +78,21 @@ namespace DirectoryAnalyzer.Agent
         {
             context.Response.ContentType = "application/json";
             context.Response.Headers.Add("X-Content-Type-Options", "nosniff");
- codex/design-production-grade-on-premises-agent-architecture-mn24bx
             context.Response.Headers.Add("Cache-Control", "no-store");
 
- main
-
             var clientThumbprint = string.Empty;
+            var clientSubject = string.Empty;
             var requestId = string.Empty;
             var actionName = string.Empty;
             var durationMs = 0L;
             var errorCode = string.Empty;
+            var concurrencyLease = false;
 
             try
             {
- codex/design-production-grade-on-premises-agent-architecture-mn24bx
+                await _concurrencyLimiter.WaitAsync(token).ConfigureAwait(false);
+                concurrencyLease = true;
+
                 if (!context.Request.IsSecureConnection)
                 {
                     errorCode = "TransportSecurity";
@@ -128,15 +129,24 @@ namespace DirectoryAnalyzer.Agent
                     return;
                 }
 
-                if (!await ValidateClientCertificateAsync(context).ConfigureAwait(false))
+                var clientCert = await ValidateClientCertificateAsync(context).ConfigureAwait(false);
+                if (clientCert == null)
                 {
                     errorCode = "ClientCertificate";
-
-                if (!await ValidateClientCertificateAsync(context, token).ConfigureAwait(false))
-                {
- main
                     context.Response.StatusCode = (int)HttpStatusCode.Forbidden;
                     await WriteResponseAsync(context, AgentResponse.Failed("", "ClientCertificate", "Client certificate not allowed."))
+                        .ConfigureAwait(false);
+                    return;
+                }
+
+                clientThumbprint = clientCert.GetCertHashString();
+                clientSubject = clientCert.Subject;
+
+                if (!_rateLimiter.TryAcquire(clientThumbprint))
+                {
+                    errorCode = "RateLimited";
+                    context.Response.StatusCode = (int)HttpStatusCode.TooManyRequests;
+                    await WriteResponseAsync(context, AgentResponse.Failed("", "RateLimited", "Request rate exceeded."))
                         .ConfigureAwait(false);
                     return;
                 }
@@ -144,10 +154,7 @@ namespace DirectoryAnalyzer.Agent
                 var request = await ReadRequestAsync(context.Request.InputStream).ConfigureAwait(false);
                 if (request == null)
                 {
- codex/design-production-grade-on-premises-agent-architecture-mn24bx
                     errorCode = "InvalidRequest";
-
- main
                     context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
                     await WriteResponseAsync(context, AgentResponse.Failed("", "InvalidRequest", "Request body invalid."))
                         .ConfigureAwait(false);
@@ -156,6 +163,33 @@ namespace DirectoryAnalyzer.Agent
 
                 requestId = request.RequestId;
                 actionName = request.ActionName;
+
+                if (string.IsNullOrWhiteSpace(requestId) || string.IsNullOrWhiteSpace(actionName))
+                {
+                    errorCode = "InvalidRequest";
+                    context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
+                    await WriteResponseAsync(context, AgentResponse.Failed("", "InvalidRequest", "RequestId and ActionName are required."))
+                        .ConfigureAwait(false);
+                    return;
+                }
+
+                if (!ValidateAntiReplay(request, out var replayError))
+                {
+                    errorCode = replayError;
+                    context.Response.StatusCode = (int)HttpStatusCode.Conflict;
+                    await WriteResponseAsync(context, AgentResponse.Failed(requestId, replayError, "Replay protection triggered."))
+                        .ConfigureAwait(false);
+                    return;
+                }
+
+                if (_config.RequireSignedRequests && !AgentRequestSigner.VerifySignature(request, clientCert))
+                {
+                    errorCode = "InvalidSignature";
+                    context.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                    await WriteResponseAsync(context, AgentResponse.Failed(requestId, "InvalidSignature", "Request signature invalid."))
+                        .ConfigureAwait(false);
+                    return;
+                }
 
                 var response = await _registry.ExecuteAsync(request, _config, token).ConfigureAwait(false);
                 durationMs = response.DurationMs;
@@ -172,38 +206,86 @@ namespace DirectoryAnalyzer.Agent
             }
             finally
             {
-                clientThumbprint = context.Request.GetClientCertificate()?.GetCertHashString() ?? string.Empty;
+                if (concurrencyLease)
+                {
+                    _concurrencyLimiter.Release();
+                }
+
                 var status = string.IsNullOrWhiteSpace(errorCode) ? "Success" : "Failed";
-                _logger.Write(AgentLogger.Create(requestId, actionName, clientThumbprint, durationMs, status, errorCode));
+                _logger.Write(AgentLogger.Create(requestId, actionName, clientThumbprint, clientSubject, durationMs, status, errorCode));
                 context.Response.OutputStream.Close();
             }
         }
 
- codex/design-production-grade-on-premises-agent-architecture-mn24bx
-        private async Task<bool> ValidateClientCertificateAsync(HttpListenerContext context)
-
-        private async Task<bool> ValidateClientCertificateAsync(HttpListenerContext context, CancellationToken token)
- main
+        private async Task<X509Certificate2> ValidateClientCertificateAsync(HttpListenerContext context)
         {
             var cert = await context.Request.GetClientCertificateAsync().ConfigureAwait(false);
             if (cert == null)
             {
-                return false;
+                return null;
             }
 
             var thumbprint = cert.GetCertHashString();
-            foreach (var allowed in _config.AnalyzerClientThumbprints)
+            var allowed = _config.AnalyzerClientThumbprints ?? Array.Empty<string>();
+            var isAllowed = false;
+            foreach (var entry in allowed)
             {
-                if (string.Equals(allowed, thumbprint, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(entry, thumbprint, StringComparison.OrdinalIgnoreCase))
                 {
-                    return true;
+                    isAllowed = true;
+                    break;
                 }
             }
 
-            return false;
+            if (!isAllowed)
+            {
+                return null;
+            }
+
+            if (_config.EnforceRevocationCheck && !ValidateCertificateChain(cert))
+            {
+                return null;
+            }
+
+            return cert;
         }
 
- codex/design-production-grade-on-premises-agent-architecture-mn24bx
+        private bool ValidateAntiReplay(AgentRequest request, out string error)
+        {
+            error = string.Empty;
+            if (request.TimestampUnixSeconds <= 0 || string.IsNullOrWhiteSpace(request.Nonce))
+            {
+                error = "ReplayMetadataMissing";
+                return false;
+            }
+
+            var requestTime = DateTimeOffset.FromUnixTimeSeconds(request.TimestampUnixSeconds);
+            var skew = Math.Abs((DateTimeOffset.UtcNow - requestTime).TotalSeconds);
+            if (skew > _config.RequestClockSkewSeconds)
+            {
+                error = "RequestExpired";
+                return false;
+            }
+
+            if (!_nonceCache.TryAdd(request.Nonce, requestTime))
+            {
+                error = "ReplayDetected";
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool ValidateCertificateChain(X509Certificate2 cert)
+        {
+            using var chain = new X509Chain();
+            chain.ChainPolicy.RevocationMode = X509RevocationMode.Online;
+            chain.ChainPolicy.RevocationFlag = X509RevocationFlag.EntireChain;
+            chain.ChainPolicy.UrlRetrievalTimeout = TimeSpan.FromSeconds(10);
+            chain.ChainPolicy.VerificationFlags = X509VerificationFlags.NoFlag;
+            return chain.Build(cert);
+        }
+
         private static void EnsureSecurePrefix(string prefix)
         {
             if (string.IsNullOrWhiteSpace(prefix) || !prefix.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
@@ -224,7 +306,7 @@ namespace DirectoryAnalyzer.Agent
             var matches = store.Certificates.Find(X509FindType.FindByThumbprint, thumbprint, false);
             if (matches.Count == 0)
             {
-                throw new InvalidOperationException("Agent TLS certificate not found in LocalMachine\\\\My.");
+                throw new InvalidOperationException("Agent TLS certificate not found in LocalMachine\\My.");
             }
         }
 
@@ -236,8 +318,6 @@ namespace DirectoryAnalyzer.Agent
             }
         }
 
-
- main
         private static Task WriteResponseAsync(HttpListenerContext context, AgentResponse response)
         {
             var serializer = new DataContractJsonSerializer(typeof(AgentResponse));
@@ -260,6 +340,89 @@ namespace DirectoryAnalyzer.Agent
 
             var serializer = new DataContractJsonSerializer(typeof(AgentRequest));
             return serializer.ReadObject(mem) as AgentRequest;
+        }
+    }
+
+    internal sealed class NonceCache
+    {
+        private readonly ConcurrentDictionary<string, DateTimeOffset> _entries = new ConcurrentDictionary<string, DateTimeOffset>();
+        private readonly TimeSpan _expiration;
+        private DateTimeOffset _lastCleanup = DateTimeOffset.MinValue;
+
+        public NonceCache(TimeSpan expiration)
+        {
+            _expiration = expiration;
+        }
+
+        public bool TryAdd(string nonce, DateTimeOffset timestamp)
+        {
+            if (!_entries.TryAdd(nonce, timestamp))
+            {
+                return false;
+            }
+
+            CleanupIfNeeded();
+            return true;
+        }
+
+        private void CleanupIfNeeded()
+        {
+            var now = DateTimeOffset.UtcNow;
+            if (now - _lastCleanup < TimeSpan.FromMinutes(1))
+            {
+                return;
+            }
+
+            foreach (var entry in _entries)
+            {
+                if (now - entry.Value > _expiration)
+                {
+                    _entries.TryRemove(entry.Key, out _);
+                }
+            }
+
+            _lastCleanup = now;
+        }
+    }
+
+    internal sealed class SlidingWindowRateLimiter
+    {
+        private readonly int _maxRequests;
+        private readonly TimeSpan _window;
+        private readonly ConcurrentDictionary<string, Queue<DateTimeOffset>> _requests =
+            new ConcurrentDictionary<string, Queue<DateTimeOffset>>(StringComparer.OrdinalIgnoreCase);
+
+        public SlidingWindowRateLimiter(int maxRequests, TimeSpan window)
+        {
+            _maxRequests = maxRequests;
+            _window = window;
+        }
+
+        public bool TryAcquire(string key)
+        {
+            if (_maxRequests <= 0)
+            {
+                return true;
+            }
+
+            var bucket = _requests.GetOrAdd(key ?? string.Empty, _ => new Queue<DateTimeOffset>());
+            var now = DateTimeOffset.UtcNow;
+
+            lock (bucket)
+            {
+                while (bucket.Count > 0 && now - bucket.Peek() > _window)
+                {
+                    bucket.Dequeue();
+                }
+
+                if (bucket.Count >= _maxRequests)
+                {
+                    return false;
+                }
+
+                bucket.Enqueue(now);
+                return true;
+            }
         }
     }
 }

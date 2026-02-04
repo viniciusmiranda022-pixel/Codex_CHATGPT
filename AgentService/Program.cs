@@ -8,12 +8,8 @@ namespace DirectoryAnalyzer.Agent
     {
         private static void Main(string[] args)
         {
- codex/design-production-grade-on-premises-agent-architecture-mn24bx
             var configPath = ResolveConfigPath("agentsettings.json");
-
-            var baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            var configPath = Path.Combine(baseDir, "agentsettings.json");
- main
+            System.Net.ServicePointManager.SecurityProtocol = System.Net.SecurityProtocolType.Tls12;
 
             if (Environment.UserInteractive)
             {
@@ -31,7 +27,6 @@ namespace DirectoryAnalyzer.Agent
                 ServiceBase.Run(new InventoryAgentService(configPath));
             }
         }
- codex/design-production-grade-on-premises-agent-architecture-mn24bx
 
         private static string ResolveConfigPath(string fileName)
         {
@@ -44,7 +39,5 @@ namespace DirectoryAnalyzer.Agent
 
             return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, fileName);
         }
-
- main
     }
 }

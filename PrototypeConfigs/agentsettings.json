@@ -6,10 +6,12 @@
   ],
   "ActionTimeoutSeconds": 30,
   "LogPath": "C:\\ProgramData\\DirectoryAnalyzer\\agent.log",
- codex/design-production-grade-on-premises-agent-architecture-mn24bx
   "Domain": "",
-  "MaxRequestBytes": 65536
-
-  "Domain": ""
- main
+  "MaxRequestBytes": 65536,
+  "RequestClockSkewSeconds": 300,
+  "ReplayCacheMinutes": 10,
+  "RequireSignedRequests": true,
+  "MaxRequestsPerMinute": 60,
+  "MaxConcurrentRequests": 10,
+  "EnforceRevocationCheck": true
 }

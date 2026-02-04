@@ -35,7 +35,6 @@
     <Reference Include="System.Security" />
   </ItemGroup>
   <ItemGroup>
- codex/design-production-grade-on-premises-agent-architecture-mn24bx
     <ProjectReference Include="..\\AgentContracts\\AgentContracts.csproj">
       <Project>{B0EAF1CE-8D20-44B1-83B8-148B97A9F0C4}</Project>
       <Name>AgentContracts</Name>
@@ -43,10 +42,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AnalyzerConfig.cs" />
-
-    <Compile Include="AnalyzerConfig.cs" />
-    <Compile Include="AnalyzerModels.cs" />
- main
     <Compile Include="Program.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

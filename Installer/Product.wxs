@@ -13,6 +13,22 @@
     <Property Id="ARPNOREPAIR" Value="yes" />
     <Property Id="ARPNOMODIFY" Value="yes" />
 
+    <Property Id="SERVICEACCOUNT" Value="NT AUTHORITY\LocalService" />
+    <Property Id="SERVICEPASSWORD" Value="" Hidden="yes" />
+    <Property Id="BINDPREFIX" Value="https://+:8443/agent/" />
+    <Property Id="CERTTHUMBPRINT" Value="" />
+    <Property Id="ANALYZERCLIENTTHUMBPRINTS" Value="" />
+    <Property Id="ACTIONTIMEOUTSECONDS" Value="30" />
+    <Property Id="LOGPATH" Value="C:\ProgramData\DirectoryAnalyzer\agent.log" />
+    <Property Id="DOMAIN" Value="" />
+    <Property Id="MAXREQUESTBYTES" Value="65536" />
+    <Property Id="REQUESTCLOCKSKEWSECONDS" Value="300" />
+    <Property Id="REPLAYCACHEMINUTES" Value="10" />
+    <Property Id="REQUIRESIGNEDREQUESTS" Value="1" />
+    <Property Id="MAXREQUESTSPERMINUTE" Value="60" />
+    <Property Id="MAXCONCURRENTREQUESTS" Value="10" />
+    <Property Id="ENFORCEREVOCATIONCHECK" Value="1" />
+
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFilesFolder">
         <Directory Id="CompanyFolder" Name="DirectoryAnalyzer">
@@ -35,11 +51,29 @@
                         Description="DirectoryAnalyzer on-prem agent service"
                         Start="auto"
                         ErrorControl="normal"
-                        Account="LocalService" />
+                        Account="[SERVICEACCOUNT]"
+                        Password="[SERVICEPASSWORD]" />
         <ServiceControl Id="StartAgentService" Name="DirectoryAnalyzerAgent" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
       </Component>
       <Component Id="AgentConfigComponent" Guid="{90B4A7B6-6B69-4C12-99B3-9A09E2B0D1FA}" Directory="ProgramDataFolder">
         <File Id="AgentConfig" Source="$(var.ProjectDir)..\PrototypeConfigs\agentsettings.json" KeyPath="yes" />
+      </Component>
+      <Component Id="AgentRegistryComponent" Guid="{6D7A6F8E-58F1-4BB1-9CE4-4A72346A0A55}" Directory="ProgramDataFolder">
+        <RegistryKey Root="HKLM" Key="SOFTWARE\DirectoryAnalyzer\Agent">
+          <RegistryValue Name="BindPrefix" Type="string" Value="[BINDPREFIX]" KeyPath="yes" />
+          <RegistryValue Name="CertThumbprint" Type="string" Value="[CERTTHUMBPRINT]" />
+          <RegistryValue Name="AnalyzerClientThumbprints" Type="string" Value="[ANALYZERCLIENTTHUMBPRINTS]" />
+          <RegistryValue Name="ActionTimeoutSeconds" Type="integer" Value="[ACTIONTIMEOUTSECONDS]" />
+          <RegistryValue Name="LogPath" Type="string" Value="[LOGPATH]" />
+          <RegistryValue Name="Domain" Type="string" Value="[DOMAIN]" />
+          <RegistryValue Name="MaxRequestBytes" Type="integer" Value="[MAXREQUESTBYTES]" />
+          <RegistryValue Name="RequestClockSkewSeconds" Type="integer" Value="[REQUESTCLOCKSKEWSECONDS]" />
+          <RegistryValue Name="ReplayCacheMinutes" Type="integer" Value="[REPLAYCACHEMINUTES]" />
+          <RegistryValue Name="RequireSignedRequests" Type="integer" Value="[REQUIRESIGNEDREQUESTS]" />
+          <RegistryValue Name="MaxRequestsPerMinute" Type="integer" Value="[MAXREQUESTSPERMINUTE]" />
+          <RegistryValue Name="MaxConcurrentRequests" Type="integer" Value="[MAXCONCURRENTREQUESTS]" />
+          <RegistryValue Name="EnforceRevocationCheck" Type="integer" Value="[ENFORCEREVOCATIONCHECK]" />
+        </RegistryKey>
       </Component>
     </ComponentGroup>
 
