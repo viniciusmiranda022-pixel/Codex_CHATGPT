@@ -1,8 +1,8 @@
 using System;
 using System.IO;
 using DirectoryAnalyzer.Agent;
+using DirectoryAnalyzer.Agent.Contracts;
 using DirectoryAnalyzer.Agent.Contracts.Services;
-using DirectoryAnalyzer.AnalyzerClient;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace DirectoryAnalyzer.Configuration.Tests

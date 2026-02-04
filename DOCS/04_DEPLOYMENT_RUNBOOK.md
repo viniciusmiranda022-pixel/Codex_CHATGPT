@@ -3,18 +3,18 @@
 ## Padrão oficial de hosting do agente
 O agente deve ser hospedado como serviço Windows instalado via MSI do projeto WiX. O MSI cria o serviço, grava `agentsettings.json` e registra parâmetros no registry.
 
-Modo console existe apenas para laboratório e validação local, pois o código executa em modo interativo quando `Environment.UserInteractive` é verdadeiro.
+O modo console existe apenas para laboratório e validação local, pois o código executa em modo interativo quando `Environment.UserInteractive` é verdadeiro.
 
 ## Pré-requisitos
 ### Aplicativo WPF
-- Windows com .NET Framework 4.8.
-- PowerShell com módulos exigidos pelos módulos que serão usados.
+1. Windows com .NET Framework 4.8.
+2. PowerShell com módulos exigidos pelos módulos que serão usados.
 
 ### Agente
-- Windows com .NET Framework 4.8.
-- Certificado de servidor em `LocalMachine\My`, com thumbprint configurado em `agentsettings.json`.
-- Certificado de cliente em `CurrentUser\My` para a UI, ou conforme o cliente que fará a chamada.
-- Porta HTTPS liberada no firewall, padrão 8443.
+1. Windows com .NET Framework 4.8.
+2. Certificado de servidor em `LocalMachine\My`, com thumbprint configurado em `agentsettings.json`.
+3. Certificado de cliente em `CurrentUser\My` para a UI, ou conforme o cliente que fará a chamada.
+4. Porta HTTPS liberada no firewall, padrão 8443.
 
 ## Certificados
 ### Servidor do agente
@@ -48,45 +48,46 @@ msiexec /i Installer\bin\Release\DirectoryAnalyzer.Agent.msi /qn \
 ```
 
 ### Validações pós instalação
-- Serviço instalado e em execução, `Get-Service DirectoryAnalyzerAgent`.
-- Arquivo de configuração criado, `%ProgramData%\DirectoryAnalyzerAgent\agentsettings.json`.
-- Log do agente criado no caminho configurado, padrão `%ProgramData%\DirectoryAnalyzerAgent\Logs\agent.log`.
+1. Serviço instalado e em execução com `Get-Service DirectoryAnalyzerAgent`.
+2. Arquivo de configuração criado em `%ProgramData%\DirectoryAnalyzerAgent\agentsettings.json`.
+3. Log do agente criado no caminho configurado, padrão `%ProgramData%\DirectoryAnalyzerAgent\Logs\agent.log`.
 
 ## Configuração do cliente do agente
-O arquivo de configuração do cliente da UI é criado automaticamente se não existir.
-- Caminho padrão, `%ProgramData%\DirectoryAnalyzerAgent\agentclientsettings.json`.
-- Preencher endpoint do agente e thumbprints allow-list.
+O arquivo de configuração do cliente da UI é criado automaticamente quando não existe.
+1. Caminho padrão em `%ProgramData%\DirectoryAnalyzerAgent\agentclientsettings.json`.
+2. Preencher endpoint do agente e thumbprints allow list.
 
 ## Precedência de configuração
 ### Agente
 1. Se existir `%ProgramData%\DirectoryAnalyzerAgent\agentsettings.json`, ele é usado.
 2. Se não existir no path novo e existir no path legado `%ProgramData%\DirectoryAnalyzer\agentsettings.json`, o arquivo é copiado para o path novo e o novo é usado.
 3. Se existir somente na base do executável, esse arquivo é usado.
-4. Se nenhum existir, o agente cria o arquivo em `%ProgramData%\DirectoryAnalyzerAgent\agentsettings.json` com defaults e registry.
+4. Se nenhum existir, o agente cria `%ProgramData%\DirectoryAnalyzerAgent\agentsettings.json` com defaults e registry.
 5. Após ler o JSON, valores em `HKLM\SOFTWARE\DirectoryAnalyzer\Agent` sobrescrevem os campos quando preenchidos.
 
-### Cliente do agente na UI
+### AnalyzerClient
 1. Se existir `%ProgramData%\DirectoryAnalyzerAgent\agentclientsettings.json`, ele é usado.
 2. Se não existir no path novo e existir no path legado `%ProgramData%\DirectoryAnalyzer\agentclientsettings.json`, o arquivo é copiado para o path novo e o novo é usado.
 3. Se existir somente na base do executável, esse arquivo é usado.
-4. Se nenhum existir, a UI cria um JSON default e passa a usá-lo.
+4. Se nenhum existir, o comando retorna erro ao tentar carregar o JSON.
 
-## Validação rápida pós-instalação
+## Validação rápida pós instalação
 Checklist objetivo após instalar e configurar certificados.
-1. Executar no host do agente: `DirectoryAnalyzer.Agent.exe --doctor`.
-2. Executar no host do cliente: `DirectoryAnalyzer.AnalyzerClient.exe --doctor`.
-3. Confirmar no console e nos logs:
-   - paths resolvidos para config e log.
-   - precedência aplicada e fonte vencedora.
-   - status de migração de config.
-   - validação de escrita no diretório de log.
-   - validação de JSON e campos obrigatórios.
-4. Logs esperados:
-   - agente: `%ProgramData%\DirectoryAnalyzerAgent\Logs\agent.log`.
-   - cliente: `%ProgramData%\DirectoryAnalyzerAgent\Logs\analyzerclient.log`.
-5. Exit code esperado:
-   - 0 quando todas as validações passam.
-   - 1 quando há falha crítica.
+1. Executar no host do agente `DirectoryAnalyzer.Agent.exe --doctor`.
+2. Executar no host do cliente `DirectoryAnalyzer.AnalyzerClient.exe --doctor`.
+3. Confirmar no console e nos logs.
+   3.1. Paths resolvidos para config e log.
+   3.2. Precedência aplicada e fonte vencedora.
+   3.3. Status de migração de config.
+   3.4. Validação de escrita no diretório de log.
+   3.5. Validação de JSON e campos obrigatórios.
+   3.6. Validação de URL e thumbprint quando aplicável.
+4. Logs esperados.
+   4.1. Agente em `%ProgramData%\DirectoryAnalyzerAgent\Logs\agent.log`.
+   4.2. Cliente em `%ProgramData%\DirectoryAnalyzerAgent\Logs\analyzerclient.log`.
+5. Exit code esperado.
+   5.1. Valor 0 quando todas as validações passam.
+   5.2. Valor 1 quando há falha crítica.
 
 ## Implantação do aplicativo WPF
 ### Build
@@ -100,9 +101,9 @@ msbuild .\DirectoryAnalyzer.sln /t:Restore,Build /p:Configuration=Release
 ```
 
 ## Validações funcionais
-- Testar porta do agente, `Test-NetConnection <host-agente> -Port 8443`.
-- Validar mTLS com o `AnalyzerClient`.
-- No WPF, habilitar Agent Mode e executar "Agent Inventory".
+1. Testar porta do agente com `Test-NetConnection <host-agente> -Port 8443`.
+2. Validar mTLS com o `AnalyzerClient`.
+3. No WPF, habilitar Agent Mode e executar "Agent Inventory".
 
 ## Alternativa de laboratório
 Execução em modo console do agente, sem serviço Windows.

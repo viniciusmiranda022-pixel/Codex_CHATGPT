@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using DirectoryAnalyzer.Agent.Contracts.Services;
+using DirectoryAnalyzer.Agent.Contracts;
 
-namespace DirectoryAnalyzer.AnalyzerClient
+namespace DirectoryAnalyzer.Agent.Contracts.Services
 {
     public static class AnalyzerConfigValidator
     {
