@@ -22,6 +22,7 @@ namespace DirectoryAnalyzer.Views
         private readonly BrokerJobService _brokerJobService;
         private const string ModuleName = "ScheduledTasksAnalyzer";
         private readonly ILogService _logService;
+        private readonly PowerShellService _powerShellService;
 
         public ScheduledTasksAnalyzerView()
         {
@@ -31,6 +32,7 @@ namespace DirectoryAnalyzer.Views
 
             _brokerJobService = new BrokerJobService(settings);
             _logService = LogService.CreateLogger(ModuleName);
+            _powerShellService = new PowerShellService();
             UpdateStatus("✔️ Pronto para iniciar a coleta.", "Pronto");
             SetBusyState(false);
         }

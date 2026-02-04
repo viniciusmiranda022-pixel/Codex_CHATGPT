@@ -47,7 +47,7 @@ namespace DirectoryAnalyzer.Agent
 
         private HubConnection BuildConnection()
         {
-            var builder = new HubConnectionBuilder();
+            IHubConnectionBuilder builder = new HubConnectionBuilder();
             builder = builder.WithUrl(_config.BrokerUrl, options =>
             {
                 var cert = TryLoadClientCertificate();
