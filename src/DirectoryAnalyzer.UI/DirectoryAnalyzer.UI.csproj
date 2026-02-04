@@ -47,10 +47,7 @@
 
   <ItemGroup>
     <PackageReference Include="MahApps.Metro" Version="2.4.10" />
- codex/transform-product-to-agent-only-architecture-xaez7h
-
     <PackageReference Include="Microsoft.PowerShell.5.ReferenceAssemblies" Version="1.1.0" />
- main
     <PackageReference Include="System.Text.Json" Version="8.0.4" />
     <PackageReference Include="System.Data.SqlClient" Version="4.8.6" />
     <PackageReference Include="System.DirectoryServices" Version="9.0.5" />
@@ -71,10 +68,7 @@
 
   <ItemGroup>
     <Compile Update="Services\LogService.cs" />
- codex/transform-product-to-agent-only-architecture-xaez7h
-
     <Compile Update="Services\PowerShellService.cs" />
- main
     <Compile Update="ViewModels\AsyncRelayCommand.cs" />
     <Compile Update="ViewModels\BaseAnalyzerViewModel.cs" />
     <Compile Update="ViewModels\DnsAnalyzerViewModel.cs" />
