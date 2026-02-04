@@ -46,12 +46,6 @@ namespace DirectoryAnalyzer.ViewModels
             try
             {
                 var settings = AgentSettingsStore.Load(_settingsPath);
-                if (!settings.AgentModeEnabled)
-                {
-                    SetStatus("⚠️ Agent Mode desabilitado. Ative para usar o agente.", "Pronto");
-                    return;
-                }
-
                 var agent = settings.Agents?.FirstOrDefault(entry => entry.Id == settings.SelectedAgentId)
                             ?? settings.Agents?.FirstOrDefault();
                 if (agent == null)

@@ -103,7 +103,7 @@ msbuild .\DirectoryAnalyzer.sln /t:Restore,Build /p:Configuration=Release
 ## Validações funcionais
 1. Testar porta do agente com `Test-NetConnection <host-agente> -Port 8443`.
 2. Validar mTLS com o `AnalyzerClient`.
-3. No WPF, habilitar Agent Mode e executar "Agent Inventory".
+3. No WPF, executar "Agent Inventory" (fluxo sempre via agente).
 
 ## Alternativa de laboratório
 Execução em modo console do agente, sem serviço Windows.

@@ -29,7 +29,7 @@ msbuild .\DirectoryAnalyzer.sln /t:Restore,Build /p:Configuration=Debug
 **Provas:** `LogService`, `DashboardService`.
 
 ## Execução: configurações
-### Agent Mode (UI)
+### UI (sempre via agente)
 * `agentclientsettings.json` em `%ProgramData%\DirectoryAnalyzerAgent\` (preferencial) ou base dir.
 
 ### Agente (service/console)

@@ -11,7 +11,6 @@ namespace DirectoryAnalyzer.ViewModels
         private readonly string _settingsPath;
         private AgentModeSettings _settings;
         private AgentEndpoint _selectedAgent;
-        private bool _agentModeEnabled;
         private string _clientCertThumbprint;
         private int _requestTimeoutSeconds;
         private int _maxRetries;
@@ -35,12 +34,6 @@ namespace DirectoryAnalyzer.ViewModels
         public ICommand RemoveAgentCommand { get; }
         public ICommand SaveCommand { get; }
         public ICommand DiscoverCommand { get; }
-
-        public bool AgentModeEnabled
-        {
-            get => _agentModeEnabled;
-            set => SetProperty(ref _agentModeEnabled, value);
-        }
 
         public string ClientCertThumbprint
         {
@@ -81,7 +74,6 @@ namespace DirectoryAnalyzer.ViewModels
                 Agents.Add(agent);
             }
 
-            AgentModeEnabled = _settings.AgentModeEnabled;
             ClientCertThumbprint = _settings.ClientCertThumbprint;
             RequestTimeoutSeconds = _settings.RequestTimeoutSeconds;
             MaxRetries = _settings.MaxRetries;
@@ -128,7 +120,6 @@ namespace DirectoryAnalyzer.ViewModels
                 Agents.Add(new AgentEndpoint());
             }
 
-            _settings.AgentModeEnabled = AgentModeEnabled;
             _settings.ClientCertThumbprint = ClientCertThumbprint;
             _settings.RequestTimeoutSeconds = RequestTimeoutSeconds;
             _settings.MaxRetries = MaxRetries;

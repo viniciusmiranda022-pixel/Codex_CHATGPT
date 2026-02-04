@@ -35,21 +35,18 @@ namespace DirectoryAnalyzer.Services
     public sealed class AgentModeSettings
     {
         [DataMember(Order = 1)]
-        public bool AgentModeEnabled { get; set; }
-
-        [DataMember(Order = 2)]
         public string SelectedAgentId { get; set; }
 
-        [DataMember(Order = 3)]
+        [DataMember(Order = 2)]
         public string ClientCertThumbprint { get; set; } = string.Empty;
 
-        [DataMember(Order = 4)]
+        [DataMember(Order = 3)]
         public int RequestTimeoutSeconds { get; set; } = 30;
 
-        [DataMember(Order = 5)]
+        [DataMember(Order = 4)]
         public int MaxRetries { get; set; } = 2;
 
-        [DataMember(Order = 6)]
+        [DataMember(Order = 5)]
         public List<AgentEndpoint> Agents { get; set; } = new List<AgentEndpoint> { new AgentEndpoint() };
     }
 
