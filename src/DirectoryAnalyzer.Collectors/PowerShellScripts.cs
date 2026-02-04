@@ -186,7 +186,7 @@ namespace DirectoryAnalyzer.Collectors
                         }
                         'Registry Values' {
                             if ($SettingValue -match '^(\d+),(.*)$') {
-                                $type = $matches[1]; $value = $matches[2].Trim('"'); $finalValue = $value; $translated = ''
+                                $type = $matches[1]; $value = $matches[2].Trim('""'); $finalValue = $value; $translated = ''
                                 if ($type -eq '4') {
                                     $dwordValue = [System.Convert]::ToInt32($value, 10); $binMap = @{ 0 = 'Desabilitado'; 1 = 'Habilitado' }
                                     $enabled = if ($binMap.ContainsKey($dwordValue)) { "" ($($binMap[$dwordValue]))"" } else { '' }
