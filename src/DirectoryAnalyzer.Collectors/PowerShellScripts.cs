@@ -36,12 +36,12 @@ namespace DirectoryAnalyzer.Collectors
             Import-Module ActiveDirectory -ErrorAction SilentlyContinue; if (-not (Get-Module ActiveDirectory)) { throw 'Módulo ActiveDirectory não encontrado.' }
             
             try { 
-                $serverList = Get-ADComputer -Filter \"$AttributeName -eq '$AttributeValue'\" | Select-Object -ExpandProperty Name 
+                $serverList = Get-ADComputer -Filter ""$AttributeName -eq '$AttributeValue'"" | Select-Object -ExpandProperty Name 
             } catch { 
-                throw \"Falha ao buscar computadores no AD: $($_.Exception.Message)\" 
+                throw ""Falha ao buscar computadores no AD: $($_.Exception.Message)"" 
             }
 
-            if (-not $serverList) { Write-Warning \"Nenhum computador encontrado com os critérios.\"; return }
+            if (-not $serverList) { Write-Warning ""Nenhum computador encontrado com os critérios.""; return }
 
             $allResults = foreach ($serverName in $serverList) {
                 if (-not (Test-Connection -ComputerName $serverName -Count 1 -Quiet -ErrorAction SilentlyContinue)) {
@@ -72,8 +72,8 @@ namespace DirectoryAnalyzer.Collectors
         private static string SmbSharesScript() => @"
             param([string]$AttributeName, [string]$AttributeValue)
             Import-Module ActiveDirectory -ErrorAction SilentlyContinue; if (-not (Get-Module ActiveDirectory)) { throw 'Módulo ActiveDirectory não encontrado.' }
-            try { $serverList = Get-ADComputer -Filter \"$AttributeName -eq '$AttributeValue'\" | Select-Object -ExpandProperty Name } catch { throw \"Falha ao buscar computadores no AD: $($_.Exception.Message)\" }
-            if (-not $serverList) { Write-Warning \"Nenhum computador encontrado.\"; return }
+            try { $serverList = Get-ADComputer -Filter ""$AttributeName -eq '$AttributeValue'"" | Select-Object -ExpandProperty Name } catch { throw ""Falha ao buscar computadores no AD: $($_.Exception.Message)"" }
+            if (-not $serverList) { Write-Warning ""Nenhum computador encontrado.""; return }
             $allResults = foreach ($serverName in $serverList) {
                 if (-not (Test-Connection -ComputerName $serverName -Count 1 -Quiet -ErrorAction SilentlyContinue)) {
                     [PSCustomObject]@{ ComputerName = $serverName; ShareName = 'N/A'; SharePath = 'N/A'; IdentityReference = 'ERRO DE CONEXÃO'; AccessControlType = 'Servidor inacessível (ping falhou)'; FileSystemRights = 'N/A'; IsInherited = $false }; continue
@@ -83,7 +83,7 @@ namespace DirectoryAnalyzer.Collectors
                     if ($shares) { foreach ($share in $shares) {
                         $folderPath = $share.Path; if(-not ([string]::IsNullOrWhiteSpace($folderPath))) {
                             try { $acl = Get-Acl -Path $folderPath -ErrorAction Stop; foreach ($ace in $acl.Access) { $localResults += [PSCustomObject]@{ ComputerName = $env:COMPUTERNAME; ShareName = $share.Name; SharePath = $share.Path; IdentityReference = $ace.IdentityReference.Value; AccessControlType = $ace.AccessControlType.ToString(); FileSystemRights = $ace.FileSystemRights.ToString(); IsInherited = $ace.IsInherited } }
-                            } catch { $localResults += [PSCustomObject]@{ ComputerName = $env:COMPUTERNAME; ShareName = $share.Name; SharePath = $share.Path; IdentityReference = \"ERRO DE ACESSO LOCAL ÀS PERMISSÕES\"; AccessControlType = $_.Exception.Message; FileSystemRights = 'N/A'; IsInherited = $false } }
+                            } catch { $localResults += [PSCustomObject]@{ ComputerName = $env:COMPUTERNAME; ShareName = $share.Name; SharePath = $share.Path; IdentityReference = ""ERRO DE ACESSO LOCAL ÀS PERMISSÕES""; AccessControlType = $_.Exception.Message; FileSystemRights = 'N/A'; IsInherited = $false } }
                         }
                     } }
                     return $localResults
@@ -96,7 +96,7 @@ namespace DirectoryAnalyzer.Collectors
         private static string InstalledServicesScript() => @"
             param([string]$AttributeName, [string]$AttributeValue)
             Import-Module ActiveDirectory -ErrorAction SilentlyContinue; if (-not (Get-Module ActiveDirectory)) { throw 'Módulo ActiveDirectory não encontrado.' }
-            try { $serverList = Get-ADComputer -Filter \"$AttributeName -eq '$AttributeValue'\" | Select-Object -ExpandProperty Name } catch { throw \"Falha ao buscar computadores no AD: $($_.Exception.Message)\" }
+            try { $serverList = Get-ADComputer -Filter ""$AttributeName -eq '$AttributeValue'"" | Select-Object -ExpandProperty Name } catch { throw ""Falha ao buscar computadores no AD: $($_.Exception.Message)"" }
             if (-not $serverList) { return }
 
             $allResults = foreach ($serverName in $serverList) {
@@ -112,8 +112,8 @@ namespace DirectoryAnalyzer.Collectors
         private static string LocalProfilesScript() => @"
             param([string]$AttributeName, [string]$AttributeValue)
             Import-Module ActiveDirectory -ErrorAction SilentlyContinue; if (-not (Get-Module ActiveDirectory)) { throw 'Módulo ActiveDirectory não encontrado.' }
-            try { $serverList = Get-ADComputer -Filter \"$AttributeName -eq '$AttributeValue'\" | Select-Object -ExpandProperty Name } catch { throw \"Falha ao buscar computadores no AD: $($_.Exception.Message)\" }
-            if (-not $serverList) { Write-Warning \"Nenhum computador encontrado.\"; return }
+            try { $serverList = Get-ADComputer -Filter ""$AttributeName -eq '$AttributeValue'"" | Select-Object -ExpandProperty Name } catch { throw ""Falha ao buscar computadores no AD: $($_.Exception.Message)"" }
+            if (-not $serverList) { Write-Warning ""Nenhum computador encontrado.""; return }
 
             $allProfiles = @()
             foreach ($serverName in $serverList) {
@@ -139,7 +139,7 @@ namespace DirectoryAnalyzer.Collectors
                         }
                     }
                 } catch {
-                    $allProfiles += [PSCustomObject]@{ ComputerName = $serverName; AccountName = 'N/A'; SID = 'N/A'; LocalPath = \"ERRO GERAL DE COLETA: $($_.Exception.Message)\"; LastUseTime = $null }
+                    $allProfiles += [PSCustomObject]@{ ComputerName = $serverName; AccountName = 'N/A'; SID = 'N/A'; LocalPath = ""ERRO GERAL DE COLETA: $($_.Exception.Message)""; LastUseTime = $null }
                 }
             }
             $allProfiles
@@ -155,11 +155,11 @@ namespace DirectoryAnalyzer.Collectors
                     switch ($PolicyArea) {
                         'System Access' {
                             switch ($SettingName) {
-                                'MinimumPasswordAge' { $returnObject.Value = \"$SettingValue dias\"; $returnObject.Description = 'Tempo mínimo que uma senha deve ser mantida.' }; 'MaximumPasswordAge' { $returnObject.Value = \"$SettingValue dias\"; $returnObject.Description = 'Tempo máximo de vida de uma senha.' }
-                                'MinimumPasswordLength' { $returnObject.Value = if ($SettingValue -eq '0') { 'Não requer (0)' } else { \"$SettingValue caracteres\" }; $returnObject.Description = 'Número mínimo de caracteres da senha.' }
-                                'PasswordHistorySize' { $returnObject.Value = if ($SettingValue -eq '0') { 'Nenhum histórico (0)' } else { \"$SettingValue senhas lembradas\" }; $returnObject.Description = 'Impede a reutilização de senhas recentes.' }
-                                'LockoutBadCount' { $returnObject.Value = if ($SettingValue -eq '0') { 'Nenhum bloqueio (0)' } else { \"$SettingValue tentativas inválidas\" }; $returnObject.Description = 'Número de tentativas falhas antes de bloquear a conta.' }
-                                'LockoutDuration' { $returnObject.Value = if ($SettingValue -eq '0') { 'Administrador deve desbloquear' } else { \"$SettingValue minutos\" }; $returnObject.Description = 'Duração do bloqueio da conta.' }
+                                'MinimumPasswordAge' { $returnObject.Value = ""$SettingValue dias""; $returnObject.Description = 'Tempo mínimo que uma senha deve ser mantida.' }; 'MaximumPasswordAge' { $returnObject.Value = ""$SettingValue dias""; $returnObject.Description = 'Tempo máximo de vida de uma senha.' }
+                                'MinimumPasswordLength' { $returnObject.Value = if ($SettingValue -eq '0') { 'Não requer (0)' } else { ""$SettingValue caracteres"" }; $returnObject.Description = 'Número mínimo de caracteres da senha.' }
+                                'PasswordHistorySize' { $returnObject.Value = if ($SettingValue -eq '0') { 'Nenhum histórico (0)' } else { ""$SettingValue senhas lembradas"" }; $returnObject.Description = 'Impede a reutilização de senhas recentes.' }
+                                'LockoutBadCount' { $returnObject.Value = if ($SettingValue -eq '0') { 'Nenhum bloqueio (0)' } else { ""$SettingValue tentativas inválidas"" }; $returnObject.Description = 'Número de tentativas falhas antes de bloquear a conta.' }
+                                'LockoutDuration' { $returnObject.Value = if ($SettingValue -eq '0') { 'Administrador deve desbloquear' } else { ""$SettingValue minutos"" }; $returnObject.Description = 'Duração do bloqueio da conta.' }
                                 'PasswordComplexity' { $returnObject.Value = if ($SettingValue -eq '1') { 'Habilitada' } else { 'Desabilitada' }; $returnObject.Description = 'Exige complexidade (maiúsculas, minúsculas, números, etc).' }
                                 'ClearTextPassword' { $returnObject.Value = if ($SettingValue -eq '1') { 'Habilitado (inseguro)' } else { 'Desabilitado' }; $returnObject.Description = 'Permite armazenar senhas de forma reversível.' }
                                 'EnableAdminAccount' { $returnObject.Value = if ($SettingValue -eq '1') { 'Habilitada' } else { 'Desabilitada' }; $returnObject.Description = 'Status da conta de Administrador local padrão.' }
@@ -189,10 +189,10 @@ namespace DirectoryAnalyzer.Collectors
                                 $type = $matches[1]; $value = $matches[2].Trim('"'); $finalValue = $value; $translated = ''
                                 if ($type -eq '4') {
                                     $dwordValue = [System.Convert]::ToInt32($value, 10); $binMap = @{ 0 = 'Desabilitado'; 1 = 'Habilitado' }
-                                    $enabled = if ($binMap.ContainsKey($dwordValue)) { \" ($($binMap[$dwordValue]))\" } else { '' }
-                                    $translated = \"DWORD:$dwordValue$enabled\"
-                                } elseif ($type -eq '7') { $finalValue = $($value.Split([char]0,[char]44) -join '; ').Trim('; '); $translated = \"Multi-String: $finalValue\" }
-                                else { $translated = \"String: $finalValue\" }
+                                    $enabled = if ($binMap.ContainsKey($dwordValue)) { "" ($($binMap[$dwordValue]))"" } else { '' }
+                                    $translated = ""DWORD:$dwordValue$enabled""
+                                } elseif ($type -eq '7') { $finalValue = $($value.Split([char]0,[char]44) -join '; ').Trim('; '); $translated = ""Multi-String: $finalValue"" }
+                                else { $translated = ""String: $finalValue"" }
                                 $returnObject.Value = $translated; $returnObject.Description = 'Configuração do registro do Windows.'
                             }
                         }
@@ -202,7 +202,7 @@ namespace DirectoryAnalyzer.Collectors
             }
 
             Import-Module ActiveDirectory -ErrorAction SilentlyContinue; if (-not (Get-Module ActiveDirectory)) { throw 'Módulo ActiveDirectory não encontrado.' }
-            try { $serverList = Get-ADComputer -Filter \"$AttributeName -eq '$AttributeValue'\" | Select-Object -ExpandProperty Name } catch { throw \"Falha ao buscar computadores no AD: $($_.Exception.Message)\" }
+            try { $serverList = Get-ADComputer -Filter ""$AttributeName -eq '$AttributeValue'"" | Select-Object -ExpandProperty Name } catch { throw ""Falha ao buscar computadores no AD: $($_.Exception.Message)"" }
             if (-not $serverList) { return }
 
             $allResults = foreach ($serverName in $serverList) {
@@ -210,7 +210,7 @@ namespace DirectoryAnalyzer.Collectors
                     [PSCustomObject]@{ ComputerName = $serverName; PolicyArea = 'Erro'; SettingName = 'Conexão'; SettingValue = 'Servidor inacessível (ping falhou)'; Descricao = '' }; continue
                 }
                 $scriptBlock = {
-                    $tempFile = Join-Path $env:TEMP \"$(New-Guid).inf\"
+                    $tempFile = Join-Path $env:TEMP ""$(New-Guid).inf""
                     try { 
                         secedit.exe /export /cfg $tempFile /quiet
                         if (Test-Path $tempFile) { Get-Content -Path $tempFile -Encoding Unicode }
@@ -231,7 +231,7 @@ namespace DirectoryAnalyzer.Collectors
                         }
                     }
                 } catch {
-                    [PSCustomObject]@{ ComputerName = $serverName; PolicyArea = 'Erro'; SettingName = 'Execução Remota'; SettingValue = \"ERRO GERAL DE COLETA: $($_.Exception.Message)\"; Descricao = '' }
+                    [PSCustomObject]@{ ComputerName = $serverName; PolicyArea = 'Erro'; SettingName = 'Execução Remota'; SettingValue = ""ERRO GERAL DE COLETA: $($_.Exception.Message)""; Descricao = '' }
                 }
             }
             $allResults
@@ -243,12 +243,12 @@ namespace DirectoryAnalyzer.Collectors
             Import-Module WebAdministration -ErrorAction SilentlyContinue; if (-not (Get-Module WebAdministration)) { throw 'Módulo WebAdministration não encontrado.' }
 
             try { 
-                $serverList = Get-ADComputer -Filter \"$AttributeName -eq '$AttributeValue'\" | Select-Object -ExpandProperty Name 
+                $serverList = Get-ADComputer -Filter ""$AttributeName -eq '$AttributeValue'"" | Select-Object -ExpandProperty Name 
             } catch { 
-                throw \"Falha ao buscar computadores no AD: $($_.Exception.Message)\" 
+                throw ""Falha ao buscar computadores no AD: $($_.Exception.Message)"" 
             }
 
-            if (-not $serverList) { Write-Warning \"Nenhum computador encontrado com os critérios.\"; return }
+            if (-not $serverList) { Write-Warning ""Nenhum computador encontrado com os critérios.""; return }
 
             $allResults = foreach ($serverName in $serverList) {
                 if (-not (Test-Connection -ComputerName $serverName -Count 1 -Quiet -ErrorAction SilentlyContinue)) {
@@ -274,7 +274,7 @@ namespace DirectoryAnalyzer.Collectors
             Import-Module ActiveDirectory -ErrorAction SilentlyContinue
             if (-not (Get-Module ActiveDirectory)) { throw 'Módulo ActiveDirectory não encontrado.' }
 
-            $filter = \"$AttributeName -eq '$AttributeValue'\"
+            $filter = ""$AttributeName -eq '$AttributeValue'""
             $users = Get-ADUser -Filter $filter -Properties ProxyAddresses, UserPrincipalName, SamAccountName
 
             $flatList = @()
@@ -395,12 +395,12 @@ namespace DirectoryAnalyzer.Collectors
                                 'A'     { $recordDataValue = '' + $record.RecordData.IPV4Address }
                                 'AAAA'  { $recordDataValue = '' + $record.RecordData.IPV6Address }
                                 'CNAME' { $recordDataValue = $record.RecordData.HostNameAlias }
-                                'MX'    { $recordDataValue = \"$($record.RecordData.MailExchange) (Pref: $($record.RecordData.Preference))\" }
+                                'MX'    { $recordDataValue = ""$($record.RecordData.MailExchange) (Pref: $($record.RecordData.Preference))"" }
                                 'NS'    { $recordDataValue = $record.RecordData.NameServer }
                                 'PTR'   { $recordDataValue = $record.RecordData.PtrDomainName }
-                                'SRV'   { $recordDataValue = \"$($record.RecordData.DomainName):$($record.RecordData.Port)\" }
-                                'SOA'   { $recordDataValue = \"Servidor Principal: $($record.RecordData.PrimaryServer)\" }
-                                default { $recordDataValue = \"Tipo não mapeado: $($record.RecordType)\" }
+                                'SRV'   { $recordDataValue = ""$($record.RecordData.DomainName):$($record.RecordData.Port)"" }
+                                'SOA'   { $recordDataValue = ""Servidor Principal: $($record.RecordData.PrimaryServer)"" }
+                                default { $recordDataValue = ""Tipo não mapeado: $($record.RecordType)"" }
                             }
                         }
                         $allRecords += [PSCustomObject]@{
