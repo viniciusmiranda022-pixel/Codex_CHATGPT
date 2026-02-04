@@ -3,9 +3,15 @@ using System.IO;
 using System.Net;
 using System.Runtime.Serialization.Json;
 using System.Security.Cryptography.X509Certificates;
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
+using System.Threading;
+using System.Threading.Tasks;
+using DirectoryAnalyzer.AgentContracts;
+
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+ main
 
 namespace DirectoryAnalyzer.Agent
 {
@@ -28,14 +34,33 @@ namespace DirectoryAnalyzer.Agent
             _registry = new ActionRegistry();
             _logger = new AgentLogger(_config.LogPath);
 
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
+            EnsureSecurePrefix(_config.BindPrefix);
+            EnsureServerCertificateAvailable(_config.CertThumbprint);
+            EnsureClientAllowList(_config.AnalyzerClientThumbprints);
+
+
+ main
             _listener.Prefixes.Clear();
             _listener.Prefixes.Add(_config.BindPrefix);
             _listener.Start();
 
             while (!token.IsCancellationRequested)
             {
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
+                try
+                {
+                    var context = await _listener.GetContextAsync().ConfigureAwait(false);
+                    _ = Task.Run(() => HandleRequestAsync(context, token), token);
+                }
+                catch (HttpListenerException)
+                {
+                    break;
+                }
+
                 var context = await _listener.GetContextAsync().ConfigureAwait(false);
                 _ = Task.Run(() => HandleRequestAsync(context, token), token);
+ main
             }
         }
 
@@ -53,6 +78,10 @@ namespace DirectoryAnalyzer.Agent
         {
             context.Response.ContentType = "application/json";
             context.Response.Headers.Add("X-Content-Type-Options", "nosniff");
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
+            context.Response.Headers.Add("Cache-Control", "no-store");
+
+ main
 
             var clientThumbprint = string.Empty;
             var requestId = string.Empty;
@@ -62,8 +91,50 @@ namespace DirectoryAnalyzer.Agent
 
             try
             {
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
+                if (!context.Request.IsSecureConnection)
+                {
+                    errorCode = "TransportSecurity";
+                    context.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                    await WriteResponseAsync(context, AgentResponse.Failed("", "TransportSecurity", "HTTPS is required."))
+                        .ConfigureAwait(false);
+                    return;
+                }
+
+                if (!string.Equals(context.Request.HttpMethod, "POST", StringComparison.OrdinalIgnoreCase))
+                {
+                    errorCode = "MethodNotAllowed";
+                    context.Response.StatusCode = (int)HttpStatusCode.MethodNotAllowed;
+                    await WriteResponseAsync(context, AgentResponse.Failed("", "MethodNotAllowed", "Only POST is supported."))
+                        .ConfigureAwait(false);
+                    return;
+                }
+
+                if (context.Request.ContentLength64 > 0 && context.Request.ContentLength64 > _config.MaxRequestBytes)
+                {
+                    errorCode = "RequestTooLarge";
+                    context.Response.StatusCode = (int)HttpStatusCode.RequestEntityTooLarge;
+                    await WriteResponseAsync(context, AgentResponse.Failed("", "RequestTooLarge", "Request exceeds size limit."))
+                        .ConfigureAwait(false);
+                    return;
+                }
+
+                if (context.Request.ContentType == null || !context.Request.ContentType.StartsWith("application/json", StringComparison.OrdinalIgnoreCase))
+                {
+                    errorCode = "InvalidContentType";
+                    context.Response.StatusCode = (int)HttpStatusCode.UnsupportedMediaType;
+                    await WriteResponseAsync(context, AgentResponse.Failed("", "InvalidContentType", "Content-Type must be application/json."))
+                        .ConfigureAwait(false);
+                    return;
+                }
+
+                if (!await ValidateClientCertificateAsync(context).ConfigureAwait(false))
+                {
+                    errorCode = "ClientCertificate";
+
                 if (!await ValidateClientCertificateAsync(context, token).ConfigureAwait(false))
                 {
+ main
                     context.Response.StatusCode = (int)HttpStatusCode.Forbidden;
                     await WriteResponseAsync(context, AgentResponse.Failed("", "ClientCertificate", "Client certificate not allowed."))
                         .ConfigureAwait(false);
@@ -73,6 +144,10 @@ namespace DirectoryAnalyzer.Agent
                 var request = await ReadRequestAsync(context.Request.InputStream).ConfigureAwait(false);
                 if (request == null)
                 {
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
+                    errorCode = "InvalidRequest";
+
+ main
                     context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
                     await WriteResponseAsync(context, AgentResponse.Failed("", "InvalidRequest", "Request body invalid."))
                         .ConfigureAwait(false);
@@ -104,7 +179,11 @@ namespace DirectoryAnalyzer.Agent
             }
         }
 
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
+        private async Task<bool> ValidateClientCertificateAsync(HttpListenerContext context)
+
         private async Task<bool> ValidateClientCertificateAsync(HttpListenerContext context, CancellationToken token)
+ main
         {
             var cert = await context.Request.GetClientCertificateAsync().ConfigureAwait(false);
             if (cert == null)
@@ -124,6 +203,41 @@ namespace DirectoryAnalyzer.Agent
             return false;
         }
 
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
+        private static void EnsureSecurePrefix(string prefix)
+        {
+            if (string.IsNullOrWhiteSpace(prefix) || !prefix.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("BindPrefix must start with https://");
+            }
+        }
+
+        private static void EnsureServerCertificateAvailable(string thumbprint)
+        {
+            if (string.IsNullOrWhiteSpace(thumbprint))
+            {
+                throw new InvalidOperationException("CertThumbprint must be configured.");
+            }
+
+            using var store = new X509Store(StoreName.My, StoreLocation.LocalMachine);
+            store.Open(OpenFlags.ReadOnly);
+            var matches = store.Certificates.Find(X509FindType.FindByThumbprint, thumbprint, false);
+            if (matches.Count == 0)
+            {
+                throw new InvalidOperationException("Agent TLS certificate not found in LocalMachine\\\\My.");
+            }
+        }
+
+        private static void EnsureClientAllowList(string[] thumbprints)
+        {
+            if (thumbprints == null || thumbprints.Length == 0)
+            {
+                throw new InvalidOperationException("AnalyzerClientThumbprints must include at least one thumbprint.");
+            }
+        }
+
+
+ main
         private static Task WriteResponseAsync(HttpListenerContext context, AgentResponse response)
         {
             var serializer = new DataContractJsonSerializer(typeof(AgentResponse));

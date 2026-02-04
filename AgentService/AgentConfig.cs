@@ -25,6 +25,12 @@ namespace DirectoryAnalyzer.Agent
 
         [DataMember(Order = 6)]
         public string Domain { get; set; } = string.Empty;
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
+
+        [DataMember(Order = 7)]
+        public int MaxRequestBytes { get; set; } = 65536;
+
+ main
     }
 
     public static class ConfigLoader

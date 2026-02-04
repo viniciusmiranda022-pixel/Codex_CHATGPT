@@ -91,6 +91,10 @@ public sealed class AgentConfig
     public string[] AnalyzerClientThumbprints { get; set; } = Array.Empty<string>();
     public int ActionTimeoutSeconds { get; set; } = 30;
     public string LogPath { get; set; } = @"C:\ProgramData\DirectoryAnalyzer\agent.log";
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
+    public int MaxRequestBytes { get; set; } = 65536;
+
+ main
 }
 
 public static class ConfigLoader
@@ -536,7 +540,11 @@ public sealed class AgentClient
 1. **Install agent binaries** to `C:\Program Files\DirectoryAnalyzer\Agent`.  
 2. **Create service account or gMSA** with read-only AD permissions.  
 3. **Install agent certificate** (LocalMachine\My) and bind HTTPS port.  
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
+4. **Configure agent JSON** at `C:\ProgramData\DirectoryAnalyzer\agentsettings.json`.  
+
 4. **Configure agent JSON** at `C:\ProgramData\DirectoryAnalyzer\agent.json`.  
+ main
 5. **Install Windows Service**:
    ```powershell
    sc.exe create DirectoryAnalyzerAgent binPath= "C:\Program Files\DirectoryAnalyzer\Agent\DirectoryAnalyzer.Agent.exe"
@@ -545,7 +553,77 @@ public sealed class AgentClient
    ```
 6. **Open firewall port** for TCP 8443 inbound from Analyzer subnet only.  
 7. **Install Analyzer client certificate** on Analyzer and configure allow-list in Analyzer config.  
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
+8. **Configure analyzer client JSON** at `C:\ProgramData\DirectoryAnalyzer\agentclientsettings.json`.  
+9. **Validate** by sending a `GetUsers` request from Analyzer UI.  
+
+---
+
+## 13. Enterprise Security Hardening (Concrete Settings)
+
+**TLS and cipher hardening (Schannel)**
+```powershell
+# Disable TLS 1.0/1.1 server endpoints
+New-Item -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\SCHANNEL\\Protocols\\TLS 1.0\\Server' -Force | Out-Null
+New-Item -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\SCHANNEL\\Protocols\\TLS 1.1\\Server' -Force | Out-Null
+Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\SCHANNEL\\Protocols\\TLS 1.0\\Server' -Name Enabled -Value 0 -Type DWord
+Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\SCHANNEL\\Protocols\\TLS 1.1\\Server' -Name Enabled -Value 0 -Type DWord
+
+# Ensure TLS 1.2 is enabled
+New-Item -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\SCHANNEL\\Protocols\\TLS 1.2\\Server' -Force | Out-Null
+Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\SCHANNEL\\Protocols\\TLS 1.2\\Server' -Name Enabled -Value 1 -Type DWord
+```
+
+**Disable RC4 and weak ciphers**
+```powershell
+New-Item -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\SCHANNEL\\Ciphers\\RC4 128/128' -Force | Out-Null
+Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\SCHANNEL\\Ciphers\\RC4 128/128' -Name Enabled -Value 0 -Type DWord
+```
+
+**Service account hardening**
+* Use a **gMSA** (`domain\\gmsaDirectoryAnalyzer$`) with read-only permissions.  
+* Deny interactive logon and remote desktop logon.  
+* Grant “Log on as a service.”  
+
+**Firewall hardening**
+```powershell
+New-NetFirewallRule -DisplayName "DirectoryAnalyzer Agent mTLS" `
+  -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8443 `
+  -RemoteAddress 10.10.10.0/24
+```
+
+**Windows auditing**
+```powershell
+AuditPol /set /subcategory:"Logon" /success:enable /failure:enable
+AuditPol /set /subcategory:"Object Access" /success:enable /failure:enable
+```
+
+---
+
+## 14. MSI Packaging (WiX)
+
+The installer is defined in `Installer/DirectoryAnalyzer.Agent.wixproj` and `Installer/Product.wxs`.
+
+**Build MSI**
+```powershell
+msbuild Installer\\DirectoryAnalyzer.Agent.wixproj /p:Configuration=Release
+```
+
+**Install**
+```powershell
+msiexec /i Installer\\bin\\Release\\DirectoryAnalyzer.Agent.msi /l*v C:\\Temp\\AgentInstall.log
+```
+
+---
+
+## 15. WPF Integration (DirectoryAnalyzer UI)
+
+* The WPF app includes an **Agent Inventory** module that calls the agent via mTLS.  
+* The UI reads configuration from `C:\\ProgramData\\DirectoryAnalyzer\\agentclientsettings.json`.  
+* The `GetUsers` action is executed through the agent and results are displayed in the DataGrid.  
+
 8. **Validate** by sending a `GetUsers` request from Analyzer UI.  
+ main
 
 ---
 

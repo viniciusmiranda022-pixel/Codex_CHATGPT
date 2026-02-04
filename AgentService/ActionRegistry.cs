@@ -3,6 +3,10 @@ using System.Collections.Generic;
 using System.DirectoryServices.AccountManagement;
 using System.Threading;
 using System.Threading.Tasks;
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
+using DirectoryAnalyzer.AgentContracts;
+
+ main
 
 namespace DirectoryAnalyzer.Agent
 {

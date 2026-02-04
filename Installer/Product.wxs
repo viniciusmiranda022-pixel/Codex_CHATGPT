@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*"
+           Name="DirectoryAnalyzer Agent"
+           Language="1033"
+           Version="1.0.0.0"
+           Manufacturer="DirectoryAnalyzer"
+           UpgradeCode="{45BFD46A-7F6A-4A34-9B2E-6E053E845237}">
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate />
+
+    <Property Id="ARPNOREPAIR" Value="yes" />
+    <Property Id="ARPNOMODIFY" Value="yes" />
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="CompanyFolder" Name="DirectoryAnalyzer">
+          <Directory Id="AgentInstallFolder" Name="Agent" />
+        </Directory>
+      </Directory>
+      <Directory Id="CommonAppDataFolder">
+        <Directory Id="ProgramDataFolder" Name="DirectoryAnalyzer" />
+      </Directory>
+    </Directory>
+
+    <ComponentGroup Id="AgentComponents">
+      <Component Id="AgentExeComponent" Guid="{2F35D74E-5DA4-4A2F-9A1E-6D6F1B9FE0F0}" Directory="AgentInstallFolder">
+        <File Id="AgentExe" Source="$(var.AgentService.TargetDir)DirectoryAnalyzer.Agent.exe" KeyPath="yes" />
+        <File Id="AgentContractsDll" Source="$(var.AgentService.TargetDir)DirectoryAnalyzer.AgentContracts.dll" />
+        <ServiceInstall Id="AgentServiceInstall"
+                        Type="ownProcess"
+                        Name="DirectoryAnalyzerAgent"
+                        DisplayName="DirectoryAnalyzer Agent"
+                        Description="DirectoryAnalyzer on-prem agent service"
+                        Start="auto"
+                        ErrorControl="normal"
+                        Account="LocalService" />
+        <ServiceControl Id="StartAgentService" Name="DirectoryAnalyzerAgent" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+      </Component>
+      <Component Id="AgentConfigComponent" Guid="{90B4A7B6-6B69-4C12-99B3-9A09E2B0D1FA}" Directory="ProgramDataFolder">
+        <File Id="AgentConfig" Source="$(var.ProjectDir)..\PrototypeConfigs\agentsettings.json" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <Feature Id="AgentFeature" Title="DirectoryAnalyzer Agent" Level="1">
+      <ComponentGroupRef Id="AgentComponents" />
+    </Feature>
+  </Product>
+</Wix>

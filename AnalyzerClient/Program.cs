@@ -3,8 +3,15 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Runtime.Serialization.Json;
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
+using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
+using DirectoryAnalyzer.AgentContracts;
+
+using System.Security.Cryptography.X509Certificates;
+using System.Threading.Tasks;
+ main
 
 namespace DirectoryAnalyzer.AnalyzerClient
 {
@@ -25,8 +32,12 @@ namespace DirectoryAnalyzer.AnalyzerClient
 
         private static async Task<int> RunAsync()
         {
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
+            var configPath = ResolveConfigPath("agentclientsettings.json");
+
             var baseDir = AppDomain.CurrentDomain.BaseDirectory;
             var configPath = Path.Combine(baseDir, "analyzersettings.json");
+ main
             var config = AnalyzerConfigLoader.Load(configPath);
 
             System.Net.ServicePointManager.SecurityProtocol = System.Net.SecurityProtocolType.Tls12;
@@ -40,8 +51,17 @@ namespace DirectoryAnalyzer.AnalyzerClient
 
             using var handler = new HttpClientHandler();
             handler.ClientCertificates.Add(clientCert);
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
+            handler.CheckCertificateRevocationList = true;
+            handler.SslProtocols = SslProtocols.Tls12;
+            handler.ServerCertificateCustomValidationCallback = (_, cert, _, errors) =>
+                cert != null &&
+                errors == System.Net.Security.SslPolicyErrors.None &&
+                config.AllowedAgentThumbprints.Any(tp =>
+
             handler.ServerCertificateCustomValidationCallback = (_, cert, _, _) =>
                 cert != null && config.AllowedAgentThumbprints.Any(tp =>
+ main
                     string.Equals(tp, cert.GetCertHashString(), StringComparison.OrdinalIgnoreCase));
 
             using var httpClient = new HttpClient(handler)
@@ -64,7 +84,12 @@ namespace DirectoryAnalyzer.AnalyzerClient
             }
 
             Console.WriteLine($"Request {response.RequestId} completed in {response.DurationMs} ms.");
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
+            var payload = response.Payload as GetUsersResult;
+            foreach (var user in payload?.Users ?? Array.Empty<UserRecord>())
+
             foreach (var user in response.Payload?.Users ?? Array.Empty<UserRecord>())
+ main
             {
                 Console.WriteLine($"{user.SamAccountName} | {user.DisplayName} | Enabled={user.Enabled}");
             }
@@ -72,6 +97,21 @@ namespace DirectoryAnalyzer.AnalyzerClient
             return 0;
         }
 
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
+        private static string ResolveConfigPath(string fileName)
+        {
+            var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+            var sharedPath = Path.Combine(programData, "DirectoryAnalyzer", fileName);
+            if (File.Exists(sharedPath))
+            {
+                return sharedPath;
+            }
+
+            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, fileName);
+        }
+
+
+ main
         private static X509Certificate2 FindCertificate(string thumbprint)
         {
             if (string.IsNullOrWhiteSpace(thumbprint))
