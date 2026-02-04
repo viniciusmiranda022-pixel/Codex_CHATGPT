@@ -14,6 +14,21 @@ Directory Analyzer is a Windows desktop WPF application for read-only assessment
 3. Build the solution (Debug or Release).
 4. Run the application from Visual Studio.
 
+### Build & Run (Command Line)
+If you clean `bin/` and `obj/`, rebuild before launching the executable.
+
+PowerShell (Developer Prompt):
+```powershell
+msbuild .\DirectoryAnalyzer.sln /t:Restore,Build /p:Configuration=Debug
+.\bin\Debug\net48\DirectoryAnalyzer.exe
+```
+
+PowerShell (Release build):
+```powershell
+msbuild .\DirectoryAnalyzer.sln /t:Restore,Build /p:Configuration=Release
+.\bin\Release\net48\DirectoryAnalyzer.exe
+```
+
 ## Architecture Overview
 The codebase is moving toward a consistent modular pattern:
 - **Collector**: read-only data acquisition (PowerShell/LDAP/WMI).
