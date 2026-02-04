@@ -35,6 +35,10 @@ namespace DirectoryAnalyzer.AgentContracts
 
     [DataContract]
     [KnownType(typeof(GetUsersResult))]
+    [KnownType(typeof(GetGroupsResult))]
+    [KnownType(typeof(GetComputersResult))]
+    [KnownType(typeof(GetGposResult))]
+    [KnownType(typeof(GetDnsZonesResult))]
     public sealed class AgentResponse
     {
         [DataMember(Order = 1)]
@@ -124,6 +128,113 @@ namespace DirectoryAnalyzer.AgentContracts
 
         [DataMember(Order = 3)]
         public bool Enabled { get; set; }
+
+        [DataMember(Order = 4)]
+        public string DistinguishedName { get; set; }
+
+        [DataMember(Order = 5)]
+        public string UserPrincipalName { get; set; }
+
+        [DataMember(Order = 6)]
+        public string ObjectSid { get; set; }
+    }
+
+    [DataContract]
+    public sealed class GetGroupsResult
+    {
+        [DataMember(Order = 1)]
+        public List<GroupRecord> Groups { get; set; } = new List<GroupRecord>();
+    }
+
+    [DataContract]
+    public sealed class GroupRecord
+    {
+        [DataMember(Order = 1)]
+        public string Name { get; set; }
+
+        [DataMember(Order = 2)]
+        public string SamAccountName { get; set; }
+
+        [DataMember(Order = 3)]
+        public string DistinguishedName { get; set; }
+
+        [DataMember(Order = 4)]
+        public string Description { get; set; }
+
+        [DataMember(Order = 5)]
+        public string GroupType { get; set; }
+    }
+
+    [DataContract]
+    public sealed class GetComputersResult
+    {
+        [DataMember(Order = 1)]
+        public List<ComputerRecord> Computers { get; set; } = new List<ComputerRecord>();
+    }
+
+    [DataContract]
+    public sealed class ComputerRecord
+    {
+        [DataMember(Order = 1)]
+        public string Name { get; set; }
+
+        [DataMember(Order = 2)]
+        public string SamAccountName { get; set; }
+
+        [DataMember(Order = 3)]
+        public string DistinguishedName { get; set; }
+
+        [DataMember(Order = 4)]
+        public string OperatingSystem { get; set; }
+
+        [DataMember(Order = 5)]
+        public bool Enabled { get; set; }
+    }
+
+    [DataContract]
+    public sealed class GetGposResult
+    {
+        [DataMember(Order = 1)]
+        public List<GpoRecord> Gpos { get; set; } = new List<GpoRecord>();
+    }
+
+    [DataContract]
+    public sealed class GpoRecord
+    {
+        [DataMember(Order = 1)]
+        public string Name { get; set; }
+
+        [DataMember(Order = 2)]
+        public string DistinguishedName { get; set; }
+
+        [DataMember(Order = 3)]
+        public string Guid { get; set; }
+
+        [DataMember(Order = 4)]
+        public string FileSystemPath { get; set; }
+    }
+
+    [DataContract]
+    public sealed class GetDnsZonesResult
+    {
+        [DataMember(Order = 1)]
+        public List<DnsZoneRecord> Zones { get; set; } = new List<DnsZoneRecord>();
+    }
+
+    [DataContract]
+    public sealed class DnsZoneRecord
+    {
+        [DataMember(Order = 1)]
+        public string Name { get; set; }
+
+        [DataMember(Order = 2)]
+        public string DistinguishedName { get; set; }
+
+        [DataMember(Order = 3)]
+        public string ZoneType { get; set; }
+
+        [DataMember(Order = 4)]
+        public bool IsDsIntegrated { get; set; }
     }
 
     public static class AgentRequestSigner
