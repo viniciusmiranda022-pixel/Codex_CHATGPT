@@ -8,7 +8,7 @@ using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
-using DirectoryAnalyzer.AgentContracts;
+using DirectoryAnalyzer.Agent.Contracts;
 
 namespace DirectoryAnalyzer.Services
 {
@@ -51,9 +51,13 @@ namespace DirectoryAnalyzer.Services
             var request = new AgentRequest
             {
                 ActionName = "GetUsers",
+                TimestampUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                Nonce = Guid.NewGuid().ToString("N"),
+                CorrelationId = Guid.NewGuid().ToString("N"),
                 Parameters = { ["IncludeDisabled"] = includeDisabled.ToString() }
             };
 
+            request.Signature = AgentRequestSigner.Sign(request, clientCert);
             var response = await PostAsync(client, new Uri(settings.AgentEndpoint), request, token).ConfigureAwait(false);
 
             if (response.Error != null)
@@ -98,7 +102,15 @@ namespace DirectoryAnalyzer.Services
             content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
 
             _logService.Info($"Calling agent at {endpoint} with request {request.RequestId}.");
-            using var response = await client.PostAsync(endpoint, content, token).ConfigureAwait(false);
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint)
+            {
+                Content = content
+            };
+            if (!string.IsNullOrWhiteSpace(request.CorrelationId))
+            {
+                httpRequest.Headers.Add("X-Correlation-Id", request.CorrelationId);
+            }
+            using var response = await client.SendAsync(httpRequest, token).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             using var responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);

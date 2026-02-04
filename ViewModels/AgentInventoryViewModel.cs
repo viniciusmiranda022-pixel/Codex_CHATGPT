@@ -1,9 +1,11 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using DirectoryAnalyzer.AgentContracts;
+using DirectoryAnalyzer.Agent.Client;
+using DirectoryAnalyzer.Agent.Contracts;
 using DirectoryAnalyzer.Services;
 
 namespace DirectoryAnalyzer.ViewModels
@@ -12,14 +14,14 @@ namespace DirectoryAnalyzer.ViewModels
     {
         private const string ModuleName = "AgentInventory";
         private readonly ILogService _logService;
-        private readonly AgentClientService _agentClient;
+        private readonly string _settingsPath;
+        private AgentClient _agentClient;
         private CancellationTokenSource _cancellationTokenSource;
 
         public AgentInventoryViewModel()
         {
             _logService = LogService.CreateLogger(ModuleName);
-            var settingsPath = ResolveSettingsPath("agentclientsettings.json");
-            _agentClient = new AgentClientService(settingsPath, _logService);
+            _settingsPath = AgentSettingsStore.ResolveSettingsPath("agentclientsettings.json");
 
             RunCommand = new AsyncRelayCommand(RunAsync, () => !IsBusy);
             CancelCommand = new RelayCommand(Cancel, () => IsBusy);
@@ -43,8 +45,32 @@ namespace DirectoryAnalyzer.ViewModels
 
             try
             {
+                var settings = AgentSettingsStore.Load(_settingsPath);
+                if (!settings.AgentModeEnabled)
+                {
+                    SetStatus("⚠️ Agent Mode desabilitado. Ative para usar o agente.", "Pronto");
+                    return;
+                }
+
+                var agent = settings.Agents?.FirstOrDefault(entry => entry.Id == settings.SelectedAgentId)
+                            ?? settings.Agents?.FirstOrDefault();
+                if (agent == null)
+                {
+                    throw new InvalidOperationException("Nenhum agente configurado.");
+                }
+
+                _agentClient = new AgentClient(new AgentClientOptions
+                {
+                    Endpoint = new Uri(agent.Endpoint),
+                    ClientCertThumbprint = settings.ClientCertThumbprint,
+                    AllowedServerThumbprints = agent.AllowedThumbprints ?? Array.Empty<string>(),
+                    Timeout = TimeSpan.FromSeconds(settings.RequestTimeoutSeconds),
+                    MaxRetries = settings.MaxRetries
+                });
+
+                var correlationId = Guid.NewGuid().ToString("N");
                 Users.Clear();
-                var result = await _agentClient.GetUsersAsync(includeDisabled: false, _cancellationTokenSource.Token);
+                var result = await _agentClient.GetUsersAsync(includeDisabled: false, correlationId, _cancellationTokenSource.Token);
                 foreach (var user in result.Users)
                 {
                     Users.Add(user);
@@ -80,16 +106,5 @@ namespace DirectoryAnalyzer.ViewModels
             (CancelCommand as RelayCommand)?.RaiseCanExecuteChanged();
         }
 
-        private static string ResolveSettingsPath(string fileName)
-        {
-            var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-            var sharedPath = System.IO.Path.Combine(programData, "DirectoryAnalyzer", fileName);
-            if (System.IO.File.Exists(sharedPath))
-            {
-                return sharedPath;
-            }
-
-            return System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, fileName);
-        }
     }
 }
