@@ -17,11 +17,9 @@ namespace DirectoryAnalyzer.Views
 {
     public partial class LocalSecurityPolicyAnalyzerView : UserControl
     {
- codex/transform-product-to-agent-only-architecture-xaez7h
         private readonly ModuleCollectionService _collectionService;
 
         private readonly BrokerJobService _brokerJobService;
- main
         private const string ModuleName = "LocalSecurityPolicyAnalyzer";
         private readonly ILogService _logService;
 
@@ -29,11 +27,9 @@ namespace DirectoryAnalyzer.Views
         {
             InitializeComponent();
             var settings = BrokerClientSettingsLoader.Load(BrokerClientSettingsStore.ResolvePath());
- codex/transform-product-to-agent-only-architecture-xaez7h
             _collectionService = new ModuleCollectionService(new BrokerJobService(settings));
 
             _brokerJobService = new BrokerJobService(settings);
- main
             _logService = LogService.CreateLogger(ModuleName);
             UpdateStatus("✔️ Pronto para iniciar a coleta.", "Pronto");
             SetBusyState(false);
@@ -68,11 +64,6 @@ namespace DirectoryAnalyzer.Views
             try
             {
                 // A lógica do script PowerShell permanece a mesma
- codex/transform-product-to-agent-only-architecture-xaez7h
-                                var moduleResult = await _collectionService.RunLocalSecurityPolicyAsync(
-                    scopeAttribute,
-                    scopeValue,
-
                 string scriptText = @"
                     param([string]$AttributeName, [string]$AttributeValue)
                     
@@ -174,7 +165,6 @@ namespace DirectoryAnalyzer.Views
                     ModuleName,
                     scriptText,
                     scriptParameters,
- main
                     Environment.UserName,
                     CancellationToken.None);
 

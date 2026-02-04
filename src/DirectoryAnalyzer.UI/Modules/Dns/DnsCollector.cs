@@ -12,11 +12,9 @@ namespace DirectoryAnalyzer.Modules.Dns
 {
     public class DnsCollector : ICollector<DnsReport>
     {
- codex/transform-product-to-agent-only-architecture-xaez7h
         private readonly ModuleCollectionService _collectionService;
 
         private readonly BrokerJobService _brokerJobService;
- main
         private readonly ILogService _logService;
         private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
         {
@@ -25,11 +23,9 @@ namespace DirectoryAnalyzer.Modules.Dns
 
         public DnsCollector(BrokerJobService brokerJobService, ILogService logService)
         {
- codex/transform-product-to-agent-only-architecture-xaez7h
             _collectionService = new ModuleCollectionService(brokerJobService ?? throw new ArgumentNullException(nameof(brokerJobService)));
 
             _brokerJobService = brokerJobService ?? throw new ArgumentNullException(nameof(brokerJobService));
- main
             _logService = logService ?? throw new ArgumentNullException(nameof(logService));
         }
 
@@ -37,9 +33,6 @@ namespace DirectoryAnalyzer.Modules.Dns
         {
             progress?.Report("Conectando ao DNS...");
             _logService.Info("Iniciando coleta completa de DNS.");
-
- codex/transform-product-to-agent-only-architecture-xaez7h
-            var moduleResult = await _collectionService.RunDnsAsync(Environment.UserName, cancellationToken);
 
             string scriptText = @"
                 Import-Module DnsServer -ErrorAction SilentlyContinue
@@ -92,7 +85,6 @@ namespace DirectoryAnalyzer.Modules.Dns
                 null,
                 Environment.UserName,
                 cancellationToken);
- main
             var report = new DnsReport();
 
             if (moduleResult?.Items?.Count > 0)
