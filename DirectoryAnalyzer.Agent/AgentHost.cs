@@ -151,7 +151,7 @@ namespace DirectoryAnalyzer.Agent
                 if (!rateResult.Allowed)
                 {
                     errorCode = "RateLimited";
-                    context.Response.StatusCode = (int)HttpStatusCode.TooManyRequests;
+                    context.Response.StatusCode = (int)(HttpStatusCode)429;
                     if (rateResult.RetryAfterSeconds > 0)
                     {
                         context.Response.Headers["Retry-After"] = rateResult.RetryAfterSeconds.ToString();
