@@ -1,0 +1,6 @@
+{
+  "BrokerBaseUrl": "https://localhost:5001",
+  "ClientCertThumbprint": "",
+  "RequestTimeoutSeconds": 30,
+  "PollIntervalSeconds": 2
+}

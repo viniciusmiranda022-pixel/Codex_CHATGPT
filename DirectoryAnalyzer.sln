@@ -3,23 +3,29 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.14.36202.13 d17.14
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryAnalyzer", "DirectoryAnalyzer.csproj", "{2C8FA93A-BAC2-0980-1BA7-140D78983607}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryAnalyzer.UI", "src\\DirectoryAnalyzer.UI\\DirectoryAnalyzer.UI.csproj", "{2C8FA93A-BAC2-0980-1BA7-140D78983607}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryAnalyzer.SmokeTests", "DirectoryAnalyzer.SmokeTests\\DirectoryAnalyzer.SmokeTests.csproj", "{D17DCC8F-902F-4DDA-8F2C-2F4BCFAA15A9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryAnalyzer.Contracts", "src\\DirectoryAnalyzer.Contracts\\DirectoryAnalyzer.Contracts.csproj", "{7B893ADB-B14F-4E04-AEFB-F2D6E46F1BCE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentService", "AgentService\\AgentService.csproj", "{5B3B8A35-DA6A-4C99-9CEB-3D345D79F2C8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryAnalyzer.Broker", "src\\DirectoryAnalyzer.Broker\\DirectoryAnalyzer.Broker.csproj", "{A6624E38-5848-41CE-8491-460623879E41}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AnalyzerClient", "AnalyzerClient\\AnalyzerClient.csproj", "{9A8A8B99-0B38-47F5-93EE-9F4377F8C44B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryAnalyzer.Collectors", "src\\DirectoryAnalyzer.Collectors\\DirectoryAnalyzer.Collectors.csproj", "{F2D428EB-005D-4782-A28B-5412BF0967B2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryAnalyzer.Configuration.Tests", "DirectoryAnalyzer.Configuration.Tests\\DirectoryAnalyzer.Configuration.Tests.csproj", "{E0B29A3B-6F1B-4CC6-9D0B-0F38C3D9B1A4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryAnalyzer.SmokeTests", "src\\DirectoryAnalyzer.SmokeTests\\DirectoryAnalyzer.SmokeTests.csproj", "{D17DCC8F-902F-4DDA-8F2C-2F4BCFAA15A9}"
 EndProject
-Project("{930C7802-8A8C-48F9-8165-68863BCCD9DD}") = "DirectoryAnalyzer.Agent.Installer", "Installer\\DirectoryAnalyzer.Agent.wixproj", "{D26C5E0B-2A2B-4EE2-AD76-25D3A5E9E8A8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentService", "src\\AgentService\\AgentService.csproj", "{5B3B8A35-DA6A-4C99-9CEB-3D345D79F2C8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryAnalyzer.Agent.Contracts", "DirectoryAnalyzer.Agent.Contracts\\DirectoryAnalyzer.Agent.Contracts.csproj", "{9710CA41-7DF0-4F93-BA0D-D54A91076788}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AnalyzerClient", "src\\AnalyzerClient\\AnalyzerClient.csproj", "{9A8A8B99-0B38-47F5-93EE-9F4377F8C44B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryAnalyzer.Agent", "DirectoryAnalyzer.Agent\\DirectoryAnalyzer.Agent.csproj", "{1FB40D11-0A06-42C8-B600-F7F361333FC2}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryAnalyzer.Configuration.Tests", "src\\DirectoryAnalyzer.Configuration.Tests\\DirectoryAnalyzer.Configuration.Tests.csproj", "{E0B29A3B-6F1B-4CC6-9D0B-0F38C3D9B1A4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryAnalyzer.Agent.Client", "DirectoryAnalyzer.Agent.Client\\DirectoryAnalyzer.Agent.Client.csproj", "{89C626AD-3CE3-4F44-BEB8-0F991969F6A4}"
+Project("{930C7802-8A8C-48F9-8165-68863BCCD9DD}") = "DirectoryAnalyzer.Agent.Installer", "src\\Installer\\DirectoryAnalyzer.Agent.wixproj", "{D26C5E0B-2A2B-4EE2-AD76-25D3A5E9E8A8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryAnalyzer.Agent.Contracts", "src\\DirectoryAnalyzer.Agent.Contracts\\DirectoryAnalyzer.Agent.Contracts.csproj", "{9710CA41-7DF0-4F93-BA0D-D54A91076788}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryAnalyzer.Agent", "src\\DirectoryAnalyzer.Agent\\DirectoryAnalyzer.Agent.csproj", "{1FB40D11-0A06-42C8-B600-F7F361333FC2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryAnalyzer.Agent.Client", "src\\DirectoryAnalyzer.Agent.Client\\DirectoryAnalyzer.Agent.Client.csproj", "{89C626AD-3CE3-4F44-BEB8-0F991969F6A4}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -31,6 +37,18 @@ Global
 		{2C8FA93A-BAC2-0980-1BA7-140D78983607}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2C8FA93A-BAC2-0980-1BA7-140D78983607}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2C8FA93A-BAC2-0980-1BA7-140D78983607}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7B893ADB-B14F-4E04-AEFB-F2D6E46F1BCE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7B893ADB-B14F-4E04-AEFB-F2D6E46F1BCE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7B893ADB-B14F-4E04-AEFB-F2D6E46F1BCE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7B893ADB-B14F-4E04-AEFB-F2D6E46F1BCE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A6624E38-5848-41CE-8491-460623879E41}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A6624E38-5848-41CE-8491-460623879E41}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A6624E38-5848-41CE-8491-460623879E41}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A6624E38-5848-41CE-8491-460623879E41}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F2D428EB-005D-4782-A28B-5412BF0967B2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F2D428EB-005D-4782-A28B-5412BF0967B2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F2D428EB-005D-4782-A28B-5412BF0967B2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F2D428EB-005D-4782-A28B-5412BF0967B2}.Release|Any CPU.Build.0 = Release|Any CPU
 		{D17DCC8F-902F-4DDA-8F2C-2F4BCFAA15A9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{D17DCC8F-902F-4DDA-8F2C-2F4BCFAA15A9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D17DCC8F-902F-4DDA-8F2C-2F4BCFAA15A9}.Release|Any CPU.ActiveCfg = Release|Any CPU
