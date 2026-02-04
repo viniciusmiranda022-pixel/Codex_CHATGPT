@@ -47,6 +47,18 @@ namespace DirectoryAnalyzer.Agent
         [DataMember(Order = 13)]
         public bool EnforceRevocationCheck { get; set; } = true;
 
+        [DataMember(Order = 14)]
+        public bool FailOpenOnRevocation { get; set; } = false;
+
+        [DataMember(Order = 15)]
+        public int MaxBurstRequests { get; set; } = 15;
+
+        [DataMember(Order = 16)]
+        public int BurstWindowSeconds { get; set; } = 10;
+
+        [DataMember(Order = 17)]
+        public int RateLimitBackoffSeconds { get; set; } = 15;
+
         public static string DefaultLogPath()
         {
             return System.IO.Path.Combine(
@@ -95,7 +107,11 @@ namespace DirectoryAnalyzer.Agent
                 RequireSignedRequests = ReadRegistryBool("RequireSignedRequests", true),
                 MaxRequestsPerMinute = ReadRegistryInt("MaxRequestsPerMinute", 60),
                 MaxConcurrentRequests = ReadRegistryInt("MaxConcurrentRequests", 10),
-                EnforceRevocationCheck = ReadRegistryBool("EnforceRevocationCheck", true)
+                EnforceRevocationCheck = ReadRegistryBool("EnforceRevocationCheck", true),
+                FailOpenOnRevocation = ReadRegistryBool("FailOpenOnRevocation", false),
+                MaxBurstRequests = ReadRegistryInt("MaxBurstRequests", 15),
+                BurstWindowSeconds = ReadRegistryInt("BurstWindowSeconds", 10),
+                RateLimitBackoffSeconds = ReadRegistryInt("RateLimitBackoffSeconds", 15)
             };
 
             Directory.CreateDirectory(Path.GetDirectoryName(path) ?? AppDomain.CurrentDomain.BaseDirectory);
@@ -146,6 +162,10 @@ namespace DirectoryAnalyzer.Agent
             config.MaxRequestsPerMinute = ReadRegistryInt("MaxRequestsPerMinute", config.MaxRequestsPerMinute);
             config.MaxConcurrentRequests = ReadRegistryInt("MaxConcurrentRequests", config.MaxConcurrentRequests);
             config.EnforceRevocationCheck = ReadRegistryBool("EnforceRevocationCheck", config.EnforceRevocationCheck);
+            config.FailOpenOnRevocation = ReadRegistryBool("FailOpenOnRevocation", config.FailOpenOnRevocation);
+            config.MaxBurstRequests = ReadRegistryInt("MaxBurstRequests", config.MaxBurstRequests);
+            config.BurstWindowSeconds = ReadRegistryInt("BurstWindowSeconds", config.BurstWindowSeconds);
+            config.RateLimitBackoffSeconds = ReadRegistryInt("RateLimitBackoffSeconds", config.RateLimitBackoffSeconds);
         }
 
         private static string ReadRegistryValue(string name, string fallback)

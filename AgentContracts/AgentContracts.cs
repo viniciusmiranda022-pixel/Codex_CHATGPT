@@ -28,6 +28,9 @@ namespace DirectoryAnalyzer.AgentContracts
 
         [DataMember(Order = 6)]
         public string Signature { get; set; } = string.Empty;
+
+        [DataMember(Order = 7, EmitDefaultValue = false)]
+        public string CorrelationId { get; set; }
     }
 
     [DataContract]
@@ -200,6 +203,7 @@ namespace DirectoryAnalyzer.AgentContracts
                 request.ActionName ?? string.Empty,
                 request.TimestampUnixSeconds.ToString(),
                 request.Nonce ?? string.Empty,
+                request.CorrelationId ?? string.Empty,
                 parameterString
             });
         }

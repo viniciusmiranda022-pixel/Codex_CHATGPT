@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Security;
 using System.Runtime.Serialization.Json;
@@ -41,7 +43,7 @@ namespace DirectoryAnalyzer.Services
 
             handler.ClientCertificates.Add(clientCert);
             handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) =>
-                ValidateServerCertificate(cert, errors, settings.AllowedAgentThumbprints);
+                ValidateServerCertificate(message?.RequestUri, cert, chain, errors, settings);
 
             using var client = new HttpClient(handler)
             {
@@ -68,15 +70,177 @@ namespace DirectoryAnalyzer.Services
             return response.Payload as GetUsersResult ?? new GetUsersResult();
         }
 
-        private static bool ValidateServerCertificate(X509Certificate cert, SslPolicyErrors errors, string[] allowedThumbprints)
+        private bool ValidateServerCertificate(
+            Uri endpoint,
+            X509Certificate cert,
+            X509Chain chain,
+            SslPolicyErrors errors,
+            AgentClientSettings settings)
         {
-            if (cert == null || errors != SslPolicyErrors.None)
+            if (cert == null || errors.HasFlag(SslPolicyErrors.RemoteCertificateNotAvailable))
             {
                 return false;
             }
 
-            var thumbprint = cert.GetCertHashString();
-            return allowedThumbprints.Any(tp => string.Equals(tp, thumbprint, StringComparison.OrdinalIgnoreCase));
+            if (endpoint == null)
+            {
+                return false;
+            }
+
+            var cert2 = cert as X509Certificate2 ?? new X509Certificate2(cert);
+            if (!ValidateServerHostname(endpoint.Host, cert2))
+            {
+                return false;
+            }
+
+            if (!ValidateCertificateChain(cert2, settings.EnforceRevocationCheck, settings.FailOpenOnRevocation, out var warning))
+            {
+                return false;
+            }
+
+            if (!string.IsNullOrWhiteSpace(warning))
+            {
+                _logService.Warn(warning);
+            }
+
+            var allowedThumbprints = settings.AllowedAgentThumbprints ?? Array.Empty<string>();
+            if (allowedThumbprints.Length > 0)
+            {
+                var thumbprint = cert2.GetCertHashString();
+                return allowedThumbprints.Any(tp => string.Equals(tp, thumbprint, StringComparison.OrdinalIgnoreCase));
+            }
+
+            return true;
+        }
+
+        private static bool ValidateCertificateChain(
+            X509Certificate2 cert,
+            bool enforceRevocation,
+            bool failOpenOnRevocation,
+            out string warning)
+        {
+            warning = string.Empty;
+            using var chain = new X509Chain();
+            chain.ChainPolicy.RevocationMode = enforceRevocation ? X509RevocationMode.Online : X509RevocationMode.NoCheck;
+            chain.ChainPolicy.RevocationFlag = X509RevocationFlag.EntireChain;
+            chain.ChainPolicy.UrlRetrievalTimeout = TimeSpan.FromSeconds(10);
+            chain.ChainPolicy.VerificationFlags = X509VerificationFlags.NoFlag;
+            var valid = chain.Build(cert);
+            if (valid)
+            {
+                return true;
+            }
+
+            if (failOpenOnRevocation && IsRevocationOnly(chain.ChainStatus))
+            {
+                warning = "Server certificate revocation status could not be verified; fail-open enabled.";
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsRevocationOnly(X509ChainStatus[] statuses)
+        {
+            if (statuses == null || statuses.Length == 0)
+            {
+                return false;
+            }
+
+            foreach (var status in statuses)
+            {
+                if (status.Status != X509ChainStatusFlags.RevocationStatusUnknown
+                    && status.Status != X509ChainStatusFlags.OfflineRevocation)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool ValidateServerHostname(string host, X509Certificate2 cert)
+        {
+            if (string.IsNullOrWhiteSpace(host))
+            {
+                return false;
+            }
+
+            var subjectAltNames = GetSubjectAltNames(cert);
+            if (subjectAltNames.Count > 0)
+            {
+                return MatchesHost(host, subjectAltNames);
+            }
+
+            var commonName = cert.GetNameInfo(X509NameType.DnsName, false);
+            return MatchesHost(host, new[] { commonName });
+        }
+
+        private static bool MatchesHost(string host, IEnumerable<string> names)
+        {
+            var isIp = IPAddress.TryParse(host, out _);
+            foreach (var name in names)
+            {
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    continue;
+                }
+
+                if (isIp)
+                {
+                    if (string.Equals(name, host, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+
+                    continue;
+                }
+
+                if (name.StartsWith("*.", StringComparison.Ordinal))
+                {
+                    var suffix = name.Substring(1);
+                    if (host.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+
+                    continue;
+                }
+
+                if (string.Equals(name, host, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static List<string> GetSubjectAltNames(X509Certificate2 cert)
+        {
+            var names = new List<string>();
+            var extension = cert.Extensions["2.5.29.17"];
+            if (extension == null)
+            {
+                return names;
+            }
+
+            var formatted = extension.Format(true);
+            var entries = formatted.Split(new[] { ',', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var entry in entries)
+            {
+                var trimmed = entry.Trim();
+                if (trimmed.StartsWith("DNS Name=", StringComparison.OrdinalIgnoreCase))
+                {
+                    names.Add(trimmed.Substring("DNS Name=".Length));
+                }
+                else if (trimmed.StartsWith("IP Address=", StringComparison.OrdinalIgnoreCase))
+                {
+                    names.Add(trimmed.Substring("IP Address=".Length));
+                }
+            }
+
+            return names;
         }
 
         private static X509Certificate2 FindCertificate(string thumbprint, StoreLocation storeLocation)

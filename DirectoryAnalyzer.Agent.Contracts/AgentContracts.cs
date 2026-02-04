@@ -247,6 +247,11 @@ namespace DirectoryAnalyzer.Agent.Contracts
                 errors.Add("Nonce is required.");
             }
 
+            if (string.IsNullOrWhiteSpace(request.CorrelationId))
+            {
+                errors.Add("CorrelationId is required.");
+            }
+
             return errors;
         }
 
