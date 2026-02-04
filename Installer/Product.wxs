@@ -15,11 +15,14 @@
 
     <Property Id="SERVICEACCOUNT" Value="NT AUTHORITY\LocalService" />
     <Property Id="SERVICEPASSWORD" Value="" Hidden="yes" />
+    <Property Id="LISTENPORT" Value="8443" />
     <Property Id="BINDPREFIX" Value="https://+:8443/agent/" />
     <Property Id="CERTTHUMBPRINT" Value="" />
-    <Property Id="ANALYZERCLIENTTHUMBPRINTS" Value="" />
+    <Property Id="ALLOWEDCLIENTCERTTHUMBPRINTS" Value="" />
+    <Property Id="TRUSTEDCATHUMBPRINTS" Value="" />
+    <Property Id="CREATEFIREWALLRULE" Value="0" />
     <Property Id="ACTIONTIMEOUTSECONDS" Value="30" />
-    <Property Id="LOGPATH" Value="C:\ProgramData\DirectoryAnalyzer\agent.log" />
+    <Property Id="LOGPATH" Value="C:\ProgramData\DirectoryAnalyzerAgent\Logs\agent.log" />
     <Property Id="DOMAIN" Value="" />
     <Property Id="MAXREQUESTBYTES" Value="65536" />
     <Property Id="REQUESTCLOCKSKEWSECONDS" Value="300" />
@@ -31,12 +34,10 @@
 
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFilesFolder">
-        <Directory Id="CompanyFolder" Name="DirectoryAnalyzer">
-          <Directory Id="AgentInstallFolder" Name="Agent" />
-        </Directory>
+        <Directory Id="AgentInstallFolder" Name="DirectoryAnalyzerAgent" />
       </Directory>
       <Directory Id="CommonAppDataFolder">
-        <Directory Id="ProgramDataFolder" Name="DirectoryAnalyzer" />
+        <Directory Id="ProgramDataFolder" Name="DirectoryAnalyzerAgent" />
       </Directory>
     </Directory>
 
@@ -56,13 +57,14 @@
         <ServiceControl Id="StartAgentService" Name="DirectoryAnalyzerAgent" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
       </Component>
       <Component Id="AgentConfigComponent" Guid="{90B4A7B6-6B69-4C12-99B3-9A09E2B0D1FA}" Directory="ProgramDataFolder">
-        <File Id="AgentConfig" Source="$(var.ProjectDir)..\PrototypeConfigs\agentsettings.json" KeyPath="yes" />
+        <CreateFolder />
       </Component>
       <Component Id="AgentRegistryComponent" Guid="{6D7A6F8E-58F1-4BB1-9CE4-4A72346A0A55}" Directory="ProgramDataFolder">
         <RegistryKey Root="HKLM" Key="SOFTWARE\DirectoryAnalyzer\Agent">
           <RegistryValue Name="BindPrefix" Type="string" Value="[BINDPREFIX]" KeyPath="yes" />
           <RegistryValue Name="CertThumbprint" Type="string" Value="[CERTTHUMBPRINT]" />
-          <RegistryValue Name="AnalyzerClientThumbprints" Type="string" Value="[ANALYZERCLIENTTHUMBPRINTS]" />
+          <RegistryValue Name="AnalyzerClientThumbprints" Type="string" Value="[ALLOWEDCLIENTCERTTHUMBPRINTS]" />
+          <RegistryValue Name="TrustedCaThumbprints" Type="string" Value="[TRUSTEDCATHUMBPRINTS]" />
           <RegistryValue Name="ActionTimeoutSeconds" Type="integer" Value="[ACTIONTIMEOUTSECONDS]" />
           <RegistryValue Name="LogPath" Type="string" Value="[LOGPATH]" />
           <RegistryValue Name="Domain" Type="string" Value="[DOMAIN]" />
@@ -76,6 +78,36 @@
         </RegistryKey>
       </Component>
     </ComponentGroup>
+
+    <CustomAction Id="SetBindPrefix"
+                  Property="BINDPREFIX"
+                  Value="https://+:[LISTENPORT]/agent/"
+                  Execute="immediate" />
+    <CustomAction Id="CreateAgentConfig"
+                  Directory="ProgramDataFolder"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="check"
+                  ExeCommand="&quot;[SystemFolder]WindowsPowerShell\\v1.0\\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -Command &quot;$port=[int]''[LISTENPORT]''; $bindPrefix=&quot;&quot;https://+:$port/agent/&quot;&quot;; $allowed=''[ALLOWEDCLIENTCERTTHUMBPRINTS]''.Split('';'') | Where-Object { $_ -and $_.Trim() -ne '''' } | ForEach-Object { $_.Trim() }; $trusted=''[TRUSTEDCATHUMBPRINTS]''.Split('';'') | Where-Object { $_ -and $_.Trim() -ne '''' } | ForEach-Object { $_.Trim() }; $config=[ordered]@{ BindPrefix=$bindPrefix; CertThumbprint=''[CERTTHUMBPRINT]''; AnalyzerClientThumbprints=$allowed; TrustedCaThumbprints=$trusted; ActionTimeoutSeconds=[int]''[ACTIONTIMEOUTSECONDS]''; LogPath=''[LOGPATH]''; Domain=''[DOMAIN]''; MaxRequestBytes=[int]''[MAXREQUESTBYTES]''; RequestClockSkewSeconds=[int]''[REQUESTCLOCKSKEWSECONDS]''; ReplayCacheMinutes=[int]''[REPLAYCACHEMINUTES]''; RequireSignedRequests=([int]''[REQUIRESIGNEDREQUESTS]'' -ne 0); MaxRequestsPerMinute=[int]''[MAXREQUESTSPERMINUTE]''; MaxConcurrentRequests=[int]''[MAXCONCURRENTREQUESTS]''; EnforceRevocationCheck=([int]''[ENFORCEREVOCATIONCHECK]'' -ne 0) }; $configPath=''[ProgramDataFolder]agentsettings.json''; $configDir=Split-Path $configPath; New-Item -ItemType Directory -Path $configDir -Force | Out-Null; $config | ConvertTo-Json -Depth 6 | Set-Content -Path $configPath -Encoding UTF8&quot;" />
+    <CustomAction Id="AddFirewallRule"
+                  Directory="SystemFolder"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="check"
+                  ExeCommand="&quot;[SystemFolder]netsh.exe&quot; advfirewall firewall add rule name=&quot;DirectoryAnalyzer Agent&quot; dir=in action=allow protocol=TCP localport=[LISTENPORT]" />
+    <CustomAction Id="RemoveFirewallRule"
+                  Directory="SystemFolder"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="check"
+                  ExeCommand="&quot;[SystemFolder]netsh.exe&quot; advfirewall firewall delete rule name=&quot;DirectoryAnalyzer Agent&quot; protocol=TCP localport=[LISTENPORT]" />
+
+    <InstallExecuteSequence>
+      <Custom Action="SetBindPrefix" Before="InstallInitialize">NOT REMOVE="all"</Custom>
+      <Custom Action="CreateAgentConfig" After="InstallFiles">NOT REMOVE="all"</Custom>
+      <Custom Action="AddFirewallRule" After="CreateAgentConfig">CREATEFIREWALLRULE=1 AND NOT REMOVE="all"</Custom>
+      <Custom Action="RemoveFirewallRule" Before="RemoveFiles">REMOVE="all"</Custom>
+    </InstallExecuteSequence>
 
     <Feature Id="AgentFeature" Title="DirectoryAnalyzer Agent" Level="1">
       <ComponentGroupRef Id="AgentComponents" />
