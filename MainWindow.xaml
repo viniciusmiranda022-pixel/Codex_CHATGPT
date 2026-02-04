@@ -26,6 +26,14 @@
                     <TextBlock Text="Análise corporativa read-only"
                                Style="{StaticResource SubtitleTextStyle}"
                                Margin="0,0,0,18"/>
+                    <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,18">
+                        <StackPanel>
+                            <TextBlock Text="Agent Mode" Style="{StaticResource SectionHeaderTextStyle}"/>
+                            <CheckBox Content="Habilitar coleta via agentes"
+                                      IsChecked="{Binding AgentModeEnabled}"
+                                      Margin="0,8,0,0"/>
+                        </StackPanel>
+                    </Border>
                     <ListBox x:Name="NavigationMenu"
                              SelectedIndex="0">
                         <ListBoxItem Tag="Dashboard">
@@ -188,6 +196,18 @@
                                 <TextBlock Text="&#xE968;" Style="{StaticResource NavIconStyle}"
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
                                 <TextBlock Text="Agent Inventory" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </ListBoxItem>
+                        <ListBoxItem Tag="Agents">
+                            <ListBoxItem.InputBindings>
+                                <MouseBinding MouseAction="LeftClick"
+                                              Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                              CommandParameter="Agents"/>
+                            </ListBoxItem.InputBindings>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE713;" Style="{StaticResource NavIconStyle}"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                                <TextBlock Text="Agents" VerticalAlignment="Center"/>
                             </StackPanel>
                         </ListBoxItem>
                     </ListBox>
