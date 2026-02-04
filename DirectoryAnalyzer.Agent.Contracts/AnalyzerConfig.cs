@@ -3,7 +3,7 @@ using System.IO;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 
-namespace DirectoryAnalyzer.AnalyzerClient
+namespace DirectoryAnalyzer.Agent.Contracts
 {
     [DataContract]
     public sealed class AnalyzerConfig
