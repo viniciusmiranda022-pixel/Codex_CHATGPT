@@ -26,14 +26,6 @@
                     <TextBlock Text="Análise corporativa read-only"
                                Style="{StaticResource SubtitleTextStyle}"
                                Margin="0,0,0,18"/>
-                    <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,18">
-                        <StackPanel>
-                            <TextBlock Text="Agent Mode" Style="{StaticResource SectionHeaderTextStyle}"/>
-                            <CheckBox Content="Habilitar coleta via agentes"
-                                      IsChecked="{Binding AgentModeEnabled}"
-                                      Margin="0,8,0,0"/>
-                        </StackPanel>
-                    </Border>
                     <ListBox x:Name="NavigationMenu"
                              SelectedIndex="0">
                         <ListBoxItem Tag="Dashboard">

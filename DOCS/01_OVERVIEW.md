@@ -38,7 +38,7 @@ Directory Analyzer é um aplicativo WPF para inventário read only de Active Dir
 3. O resultado é exibido na UI, logado em arquivo e registrado no dashboard.
 
 ### Execução via agente
-1. Usuário habilita Agent Mode e configura `agentclientsettings.json`.
+1. Usuário configura `agentclientsettings.json` (UI sempre via agente).
 2. A UI cria uma requisição assinada e conecta no endpoint HTTPS do agente.
 3. O agente valida certificado do cliente, anti replay e assinatura.
 4. O agente executa a ação allow list e retorna o resultado.

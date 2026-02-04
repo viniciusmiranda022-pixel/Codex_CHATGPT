@@ -149,9 +149,8 @@ O agente viabiliza coleta remota em ambientes onde a estação do operador não 
 **Provas:** `AnalyzerClient/Program.cs`.
 
 ### Opção 2: UI WPF
-1. Habilitar Agent Mode.
-2. Abrir “Agent Inventory”.
-3. Executar consulta de usuários.
+1. Abrir “Agent Inventory”.
+2. Executar consulta de usuários (fluxo sempre via agente).
 
 **Provas:** `AgentInventoryViewModel`.
 

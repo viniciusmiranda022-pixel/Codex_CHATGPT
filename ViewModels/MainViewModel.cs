@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
-using DirectoryAnalyzer.Services;
 using DirectoryAnalyzer.Views;
 
 namespace DirectoryAnalyzer.ViewModels
@@ -12,16 +11,9 @@ namespace DirectoryAnalyzer.ViewModels
     {
         private readonly Dictionary<string, Func<object>> _viewFactory;
         private object _currentView;
-        private readonly string _settingsPath;
-        private AgentModeSettings _settings;
-        private bool _agentModeEnabled;
 
         public MainViewModel()
         {
-            _settingsPath = AgentSettingsStore.ResolveSettingsPath("agentclientsettings.json");
-            _settings = AgentSettingsStore.Load(_settingsPath);
-            _agentModeEnabled = _settings.AgentModeEnabled;
-
             _viewFactory = new Dictionary<string, Func<object>>(StringComparer.OrdinalIgnoreCase)
             {
                 ["Dashboard"] = () => new DashboardView(),
@@ -53,19 +45,6 @@ namespace DirectoryAnalyzer.ViewModels
         public event PropertyChangedEventHandler PropertyChanged;
 
         public ICommand NavigateCommand { get; }
-
-        public bool AgentModeEnabled
-        {
-            get => _agentModeEnabled;
-            set
-            {
-                if (SetProperty(ref _agentModeEnabled, value))
-                {
-                    _settings.AgentModeEnabled = value;
-                    AgentSettingsStore.Save(_settingsPath, _settings);
-                }
-            }
-        }
 
         public object CurrentView
         {
@@ -100,16 +79,5 @@ namespace DirectoryAnalyzer.ViewModels
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        private bool SetProperty<T>(ref T storage, T value, [CallerMemberName] string propertyName = null)
-        {
-            if (Equals(storage, value))
-            {
-                return false;
-            }
-
-            storage = value;
-            OnPropertyChanged(propertyName);
-            return true;
-        }
     }
 }

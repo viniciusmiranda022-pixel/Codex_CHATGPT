@@ -25,19 +25,14 @@
         <Border Grid.Row="1" Style="{StaticResource CardStyle}" Margin="0,12,0,0">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="2*"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
-                    <TextBlock Text="Agent Mode" Style="{StaticResource SectionHeaderTextStyle}"/>
-                    <CheckBox Content="Habilitar Agent Mode" IsChecked="{Binding AgentModeEnabled}" Margin="0,8,0,0"/>
-                </StackPanel>
-                <StackPanel Grid.Column="1" Margin="16,0,0,0">
                     <TextBlock Text="Client Cert Thumbprint" Style="{StaticResource SectionHeaderTextStyle}"/>
                     <TextBox Text="{Binding ClientCertThumbprint}" Margin="0,8,0,0"/>
                 </StackPanel>
-                <StackPanel Grid.Column="2" Margin="16,0,0,0">
+                <StackPanel Grid.Column="1" Margin="16,0,0,0">
                     <TextBlock Text="Timeout (s) / Retries" Style="{StaticResource SectionHeaderTextStyle}"/>
                     <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                         <TextBox Text="{Binding RequestTimeoutSeconds}" Width="80" Margin="0,0,10,0"/>

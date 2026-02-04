@@ -7,9 +7,8 @@
 3. O dashboard grava a atividade recente em `%LocalAppData%\DirectoryAnalyzer\recent.json`.
 
 ### Execução via agente
-1. Habilite Agent Mode na UI.
-2. Garanta que `%ProgramData%\DirectoryAnalyzerAgent\agentclientsettings.json` esteja configurado.
-3. O módulo "Agent Inventory" executa `GetUsers` via agente.
+1. Garanta que `%ProgramData%\DirectoryAnalyzerAgent\agentclientsettings.json` esteja configurado.
+2. O módulo "Agent Inventory" executa `GetUsers` via agente (UI sempre via agente).
 
 ## Coleta de evidências
 1. Logs do WPF em `%LocalAppData%\DirectoryAnalyzer\Logs\<ModuleName>`.

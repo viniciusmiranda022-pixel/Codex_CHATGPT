@@ -82,7 +82,7 @@ Documentar a arquitetura real do repositório, a estrutura da solução e como o
 **Provas:** `ExportService.cs`.
 
 ## Configuração e carregamento
-* **Agent Mode (UI):** `AgentSettingsStore` resolve `agentclientsettings.json`.
+* **UI sempre via agente:** `AgentSettingsStore` resolve `agentclientsettings.json` (sem toggle de Agent Mode).
 * **Agente:** `AgentConfigLoader` carrega `agentsettings.json` e sobrescreve via registry.
 
 **Provas:** `Services/AgentSettings.cs`, `DirectoryAnalyzer.Agent.Contracts/AgentConfig.cs`.
