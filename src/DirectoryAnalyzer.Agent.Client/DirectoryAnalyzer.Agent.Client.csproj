@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\\DirectoryAnalyzer.Contracts\\DirectoryAnalyzer.Contracts.csproj" />
+    <ProjectReference Include="..\DirectoryAnalyzer.Agent.Contracts\DirectoryAnalyzer.Agent.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+</Project>
