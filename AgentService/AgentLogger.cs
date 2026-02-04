@@ -1,0 +1,76 @@
+using System;
+using System.Globalization;
+using System.IO;
+using System.Runtime.Serialization.Json;
+using System.Text;
+
+namespace DirectoryAnalyzer.Agent
+{
+    public sealed class AgentLogger
+    {
+        private readonly string _logPath;
+        private readonly object _sync = new object();
+
+        public AgentLogger(string logPath)
+        {
+            _logPath = logPath;
+            var dir = Path.GetDirectoryName(_logPath);
+            if (!string.IsNullOrWhiteSpace(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+        }
+
+        public void Write(AgentLogEntry entry)
+        {
+            var serializer = new DataContractJsonSerializer(typeof(AgentLogEntry));
+            using var buffer = new MemoryStream();
+            serializer.WriteObject(buffer, entry);
+            var json = Encoding.UTF8.GetString(buffer.ToArray());
+
+            lock (_sync)
+            {
+                File.AppendAllText(_logPath, json + Environment.NewLine, Encoding.UTF8);
+            }
+        }
+
+        public static AgentLogEntry Create(string requestId, string actionName, string clientThumbprint, long durationMs, string status, string errorCode)
+        {
+            return new AgentLogEntry
+            {
+                TimestampUtc = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
+                RequestId = requestId,
+                ActionName = actionName,
+                ClientThumbprint = clientThumbprint,
+                DurationMs = durationMs,
+                Status = status,
+                ErrorCode = errorCode
+            };
+        }
+    }
+
+    [System.Runtime.Serialization.DataContract]
+    public sealed class AgentLogEntry
+    {
+        [System.Runtime.Serialization.DataMember(Order = 1)]
+        public string TimestampUtc { get; set; }
+
+        [System.Runtime.Serialization.DataMember(Order = 2)]
+        public string RequestId { get; set; }
+
+        [System.Runtime.Serialization.DataMember(Order = 3)]
+        public string ActionName { get; set; }
+
+        [System.Runtime.Serialization.DataMember(Order = 4)]
+        public string ClientThumbprint { get; set; }
+
+        [System.Runtime.Serialization.DataMember(Order = 5)]
+        public long DurationMs { get; set; }
+
+        [System.Runtime.Serialization.DataMember(Order = 6)]
+        public string Status { get; set; }
+
+        [System.Runtime.Serialization.DataMember(Order = 7, EmitDefaultValue = false)]
+        public string ErrorCode { get; set; }
+    }
+}
