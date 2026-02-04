@@ -44,7 +44,7 @@
     <ComponentGroup Id="AgentComponents">
       <Component Id="AgentExeComponent" Guid="{2F35D74E-5DA4-4A2F-9A1E-6D6F1B9FE0F0}" Directory="AgentInstallFolder">
         <File Id="AgentExe" Source="$(var.AgentService.TargetDir)DirectoryAnalyzer.Agent.exe" KeyPath="yes" />
-        <File Id="AgentContractsDll" Source="$(var.AgentService.TargetDir)DirectoryAnalyzer.AgentContracts.dll" />
+        <File Id="AgentContractsDll" Source="$(var.AgentService.TargetDir)DirectoryAnalyzer.Agent.Contracts.dll" />
         <ServiceInstall Id="AgentServiceInstall"
                         Type="ownProcess"
                         Name="DirectoryAnalyzerAgent"

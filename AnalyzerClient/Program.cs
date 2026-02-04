@@ -9,7 +9,7 @@ using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
-using DirectoryAnalyzer.AgentContracts;
+using DirectoryAnalyzer.Agent.Contracts;
 
 namespace DirectoryAnalyzer.AnalyzerClient
 {
@@ -77,7 +77,7 @@ namespace DirectoryAnalyzer.AnalyzerClient
             Console.WriteLine($"Request {response.RequestId} completed in {response.DurationMs} ms.");
 
             var payload = response.Payload as GetUsersResult;
-            foreach (var user in payload?.Users ?? Array.Empty<UserRecord>())
+            foreach (var user in payload?.Users ?? new List<UserRecord>())
             {
                 Console.WriteLine($"{user.SamAccountName} | {user.DisplayName} | Enabled={user.Enabled}");
             }

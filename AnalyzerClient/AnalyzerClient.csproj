@@ -11,6 +11,7 @@
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <Deterministic>true</Deterministic>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -33,11 +34,12 @@
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.Security" />
+    <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\\AgentContracts\\AgentContracts.csproj">
-      <Project>{B0EAF1CE-8D20-44B1-83B8-148B97A9F0C4}</Project>
-      <Name>AgentContracts</Name>
+    <ProjectReference Include="..\\DirectoryAnalyzer.Agent.Contracts\\DirectoryAnalyzer.Agent.Contracts.csproj">
+      <Project>{9710CA41-7DF0-4F93-BA0D-D54A91076788}</Project>
+      <Name>DirectoryAnalyzer.Agent.Contracts</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
