@@ -26,7 +26,8 @@ namespace DirectoryAnalyzer.ViewModels
                 ["Local Security Policy Analyzer"] = () => new LocalSecurityPolicyAnalyzerView(),
                 ["IIS AppPools Analyzer"] = () => new IisAppPoolsAnalyzerView(),
                 ["Trusts Analyzer"] = () => new TrustsAnalyzerView(),
-                ["ProxyAddresses Analyzer"] = () => new ProxyAddressAnalyzerView()
+                ["ProxyAddresses Analyzer"] = () => new ProxyAddressAnalyzerView(),
+                ["Agent Inventory"] = () => new AgentInventoryView()
             };
 
             NavigateCommand = new ParameterRelayCommand(parameter =>

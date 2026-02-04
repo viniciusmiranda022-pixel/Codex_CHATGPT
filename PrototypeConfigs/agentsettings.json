@@ -1,0 +1,11 @@
+{
+  "BindPrefix": "https://+:8443/agent/",
+  "CertThumbprint": "REPLACE_WITH_AGENT_CERT_THUMBPRINT",
+  "AnalyzerClientThumbprints": [
+    "REPLACE_WITH_ANALYZER_CLIENT_CERT_THUMBPRINT"
+  ],
+  "ActionTimeoutSeconds": 30,
+  "LogPath": "C:\\ProgramData\\DirectoryAnalyzer\\agent.log",
+  "Domain": "",
+  "MaxRequestBytes": 65536
+}
