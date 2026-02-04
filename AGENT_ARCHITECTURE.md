@@ -91,7 +91,10 @@ public sealed class AgentConfig
     public string[] AnalyzerClientThumbprints { get; set; } = Array.Empty<string>();
     public int ActionTimeoutSeconds { get; set; } = 30;
     public string LogPath { get; set; } = @"C:\ProgramData\DirectoryAnalyzer\agent.log";
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
     public int MaxRequestBytes { get; set; } = 65536;
+
+ main
 }
 
 public static class ConfigLoader
@@ -537,7 +540,11 @@ public sealed class AgentClient
 1. **Install agent binaries** to `C:\Program Files\DirectoryAnalyzer\Agent`.  
 2. **Create service account or gMSA** with read-only AD permissions.  
 3. **Install agent certificate** (LocalMachine\My) and bind HTTPS port.  
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
 4. **Configure agent JSON** at `C:\ProgramData\DirectoryAnalyzer\agentsettings.json`.  
+
+4. **Configure agent JSON** at `C:\ProgramData\DirectoryAnalyzer\agent.json`.  
+ main
 5. **Install Windows Service**:
    ```powershell
    sc.exe create DirectoryAnalyzerAgent binPath= "C:\Program Files\DirectoryAnalyzer\Agent\DirectoryAnalyzer.Agent.exe"
@@ -546,6 +553,7 @@ public sealed class AgentClient
    ```
 6. **Open firewall port** for TCP 8443 inbound from Analyzer subnet only.  
 7. **Install Analyzer client certificate** on Analyzer and configure allow-list in Analyzer config.  
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
 8. **Configure analyzer client JSON** at `C:\ProgramData\DirectoryAnalyzer\agentclientsettings.json`.  
 9. **Validate** by sending a `GetUsers` request from Analyzer UI.  
 
@@ -613,6 +621,9 @@ msiexec /i Installer\\bin\\Release\\DirectoryAnalyzer.Agent.msi /l*v C:\\Temp\\A
 * The WPF app includes an **Agent Inventory** module that calls the agent via mTLS.  
 * The UI reads configuration from `C:\\ProgramData\\DirectoryAnalyzer\\agentclientsettings.json`.  
 * The `GetUsers` action is executed through the agent and results are displayed in the DataGrid.  
+
+8. **Validate** by sending a `GetUsers` request from Analyzer UI.  
+ main
 
 ---
 

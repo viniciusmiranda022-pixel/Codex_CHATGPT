@@ -37,6 +37,7 @@
     <Reference Include="System.ServiceProcess" />
   </ItemGroup>
   <ItemGroup>
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
     <ProjectReference Include="..\\AgentContracts\\AgentContracts.csproj">
       <Project>{B0EAF1CE-8D20-44B1-83B8-148B97A9F0C4}</Project>
       <Name>AgentContracts</Name>
@@ -46,6 +47,12 @@
     <Compile Include="ActionRegistry.cs" />
     <Compile Include="AgentConfig.cs" />
     <Compile Include="AgentHost.cs" />
+
+    <Compile Include="ActionRegistry.cs" />
+    <Compile Include="AgentConfig.cs" />
+    <Compile Include="AgentHost.cs" />
+    <Compile Include="AgentModels.cs" />
+ main
     <Compile Include="AgentLogger.cs" />
     <Compile Include="InventoryAgentService.cs" />
     <Compile Include="Program.cs" />

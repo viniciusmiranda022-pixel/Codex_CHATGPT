@@ -6,6 +6,10 @@
   ],
   "ActionTimeoutSeconds": 30,
   "LogPath": "C:\\ProgramData\\DirectoryAnalyzer\\agent.log",
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
   "Domain": "",
   "MaxRequestBytes": 65536
+
+  "Domain": ""
+ main
 }

@@ -38,12 +38,15 @@ $agentCert = New-SelfSignedCertificate `
 $agentThumb = $agentCert.Thumbprint
 ```
 
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
 ```powershell
 # Trust the self-signed agent certificate for client validation (lab only)
 Export-Certificate -Cert $agentCert -FilePath C:\Temp\agent.cer
 Import-Certificate -FilePath C:\Temp\agent.cer -CertStoreLocation cert:\LocalMachine\Root
 ```
 
+
+ main
 ### Analyzer client certificate
 ```powershell
 $clientCert = New-SelfSignedCertificate `
@@ -56,12 +59,15 @@ $clientCert = New-SelfSignedCertificate `
 $clientThumb = $clientCert.Thumbprint
 ```
 
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
 ```powershell
 # Trust the self-signed client certificate for mTLS (lab only)
 Export-Certificate -Cert $clientCert -FilePath C:\Temp\client.cer
 Import-Certificate -FilePath C:\Temp\client.cer -CertStoreLocation cert:\CurrentUser\Root
 ```
 
+
+ main
 ### Bind certificate to HTTPS port with client cert negotiation
 ```powershell
 netsh http add sslcert ipport=0.0.0.0:8443 `
@@ -74,6 +80,7 @@ netsh http add sslcert ipport=0.0.0.0:8443 `
 
 ## Configure JSON Settings
 
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
 1. Copy `PrototypeConfigs/agentsettings.json` to `C:\ProgramData\DirectoryAnalyzer\agentsettings.json`.
 2. Replace:
    * `CertThumbprint` with `$agentThumb`
@@ -81,6 +88,14 @@ netsh http add sslcert ipport=0.0.0.0:8443 `
    * `MaxRequestBytes` if you need higher request limits
 
 3. Copy `PrototypeConfigs/agentclientsettings.json` to `C:\ProgramData\DirectoryAnalyzer\agentclientsettings.json`.
+
+1. Copy `PrototypeConfigs/agentsettings.json` to `AgentService/bin/Release/agentsettings.json`.
+2. Replace:
+   * `CertThumbprint` with `$agentThumb`
+   * `AnalyzerClientThumbprints` with `$clientThumb`
+
+3. Copy `PrototypeConfigs/analyzersettings.json` to `AnalyzerClient/bin/Release/analyzersettings.json`.
+ main
 4. Replace:
    * `ClientCertThumbprint` with `$clientThumb`
    * `AllowedAgentThumbprints` with `$agentThumb`
@@ -151,6 +166,7 @@ jsmith | John Smith | Enabled=True
 * TLS is enforced via OS policy; disable TLS 1.0/1.1 in Schannel for production.
 * The agent verifies the Analyzer client certificate by thumbprint allow-list.
 * The Analyzer validates the agent certificate thumbprint.
+ codex/design-production-grade-on-premises-agent-architecture-mn24bx
 
 ---
 
@@ -187,3 +203,5 @@ For production, reconfigure the service to run under a gMSA or dedicated service
 ```powershell
 sc.exe config DirectoryAnalyzerAgent obj= \"CONTOSO\\gmsaDirectoryAnalyzer$\" password= \"\"
 ```
+
+ main
