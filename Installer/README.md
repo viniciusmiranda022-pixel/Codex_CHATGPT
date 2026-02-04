@@ -1,5 +1,8 @@
 # DirectoryAnalyzer Agent MSI (WiX)
 
+## Documentação consolidada
+Use `DOCS/01_OVERVIEW.md` como ponto de entrada da documentação atual.
+
 ## Silent install examples
 
 Install with explicit listen port, server certificate thumbprint, and allowed client certificates:

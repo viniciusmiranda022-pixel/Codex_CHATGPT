@@ -44,6 +44,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AnalyzerConfig.cs" />
+    <Compile Include="AnalyzerConfigValidator.cs" />
+    <Compile Include="DiagnosticLogger.cs" />
     <Compile Include="Program.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

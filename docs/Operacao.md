@@ -22,21 +22,28 @@ Descrever o ciclo operacional (build, execução, logs, config, upgrade/rollback
 msbuild .\DirectoryAnalyzer.sln /t:Restore,Build /p:Configuration=Debug
 ```
 
-## Execução — logs
+## Execução: logs
 * Logs por módulo: `%LocalAppData%\DirectoryAnalyzer\Logs\<ModuleName>\<ModuleName>_yyyyMMdd_HHmmss.log`.
 * Dashboard: `%LocalAppData%\DirectoryAnalyzer\recent.json`.
 
 **Provas:** `LogService`, `DashboardService`.
 
-## Execução — configurações
+## Execução: configurações
 ### Agent Mode (UI)
 * `agentclientsettings.json` em `%ProgramData%\DirectoryAnalyzerAgent\` (preferencial) ou base dir.
 
 ### Agente (service/console)
-* `agentsettings.json` em `%ProgramData%\DirectoryAnalyzer\` (preferencial) ou base dir.
+* `agentsettings.json` em `%ProgramData%\DirectoryAnalyzerAgent\` (preferencial) ou base dir.
 * Overrides no registry: `HKLM\SOFTWARE\DirectoryAnalyzer\Agent`.
 
-**Provas:** `AgentSettingsStore`, `ConfigLoader`.
+### Precedência
+1. Se o arquivo existir em `%ProgramData%\DirectoryAnalyzerAgent\`, ele é usado.
+2. Se não existir no path novo e existir no path legado `%ProgramData%\DirectoryAnalyzer\`, o arquivo é copiado para o path novo e o novo é usado.
+3. Se não existir no ProgramData, o arquivo na base do executável é usado.
+4. Se o JSON do agente não existir, ele é criado com valores do registry e defaults.
+5. Para o agente, valores no registry sobrescrevem o JSON quando preenchidos.
+
+**Provas:** `AgentSettingsStore`, `AgentConfigLoader`.
 
 ## Ponteiros de código (provas)
 * Build target: `DirectoryAnalyzer.csproj` (net48, WPF).
@@ -51,7 +58,7 @@ msbuild .\DirectoryAnalyzer.sln /t:Restore,Build /p:Configuration=Debug
 **Provas:** `Installer/Product.wxs`.
 
 ## LIMITAÇÕES ATUAIS
-* Mismatch de path entre instalador e resolver do agente.
+* `TrustedCaThumbprints` não é consumido pelo agente, o JSON e o registry podem conter o valor, mas o host não aplica allowlist de CA.
 
 ## COMO VALIDAR
 1. Executar WPF e verificar logs.

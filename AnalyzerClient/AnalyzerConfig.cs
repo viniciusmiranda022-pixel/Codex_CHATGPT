@@ -41,5 +41,21 @@ namespace DirectoryAnalyzer.AnalyzerClient
 
             return config;
         }
+
+        public static bool TryLoad(string path, out AnalyzerConfig config, out string error)
+        {
+            try
+            {
+                config = Load(path);
+                error = string.Empty;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                config = null;
+                error = ex.Message;
+                return false;
+            }
+        }
     }
 }

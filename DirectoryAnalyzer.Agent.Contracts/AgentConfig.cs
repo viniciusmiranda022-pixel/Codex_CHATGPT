@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
+using DirectoryAnalyzer.Agent.Contracts.Services;
 
 namespace DirectoryAnalyzer.Agent
 {
@@ -21,7 +23,7 @@ namespace DirectoryAnalyzer.Agent
         public int ActionTimeoutSeconds { get; set; } = 30;
 
         [DataMember(Order = 5)]
-        public string LogPath { get; set; } = @"C:\ProgramData\DirectoryAnalyzer\agent.log";
+        public string LogPath { get; set; } = DefaultLogPath();
 
         [DataMember(Order = 6)]
         public string Domain { get; set; } = string.Empty;
@@ -58,12 +60,31 @@ namespace DirectoryAnalyzer.Agent
 
         [DataMember(Order = 17)]
         public int RateLimitBackoffSeconds { get; set; } = 15;
+
+        public static string DefaultLogPath()
+        {
+            var policy = new PathPolicy();
+            return policy.DefaultAgentLogPath;
+        }
     }
 
-    public static class ConfigLoader
+    public sealed class AgentConfigLoadResult
     {
-        public static AgentConfig Load(string path)
+        public AgentConfig Config { get; set; }
+        public IReadOnlyList<string> RegistryOverrides { get; set; } = Array.Empty<string>();
+        public string LogPathSource { get; set; }
+        public bool ConfigFileLoaded { get; set; }
+    }
+
+    public static class AgentConfigLoader
+    {
+        public static AgentConfigLoadResult Load(string path)
         {
+            if (path == null)
+            {
+                throw new ArgumentNullException(nameof(path));
+            }
+
             if (File.Exists(path))
             {
                 using var stream = File.OpenRead(path);
@@ -74,14 +95,52 @@ namespace DirectoryAnalyzer.Agent
                     throw new InvalidOperationException("Invalid agent configuration.");
                 }
 
-                ApplyRegistryOverrides(config);
-                return config;
+                var overrides = ApplyRegistryOverrides(config, out var logPathSource);
+                if (string.IsNullOrWhiteSpace(config.LogPath))
+                {
+                    config.LogPath = AgentConfig.DefaultLogPath();
+                    if (string.IsNullOrWhiteSpace(logPathSource))
+                    {
+                        logPathSource = "Default";
+                    }
+                }
+
+                return new AgentConfigLoadResult
+                {
+                    Config = config,
+                    RegistryOverrides = overrides,
+                    LogPathSource = string.IsNullOrWhiteSpace(logPathSource) ? "Config" : logPathSource,
+                    ConfigFileLoaded = true
+                };
             }
 
-            return CreateFromRegistry(path);
+            var created = CreateFromRegistry(path, out var createOverrides, out var createdLogSource);
+            return new AgentConfigLoadResult
+            {
+                Config = created,
+                RegistryOverrides = createOverrides,
+                LogPathSource = string.IsNullOrWhiteSpace(createdLogSource) ? "Default" : createdLogSource,
+                ConfigFileLoaded = false
+            };
         }
 
-        private static AgentConfig CreateFromRegistry(string path)
+        public static bool TryLoad(string path, out AgentConfigLoadResult result, out string error)
+        {
+            try
+            {
+                result = Load(path);
+                error = string.Empty;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                result = null;
+                error = ex.Message;
+                return false;
+            }
+        }
+
+        private static AgentConfig CreateFromRegistry(string path, out IReadOnlyList<string> overrides, out string logPathSource)
         {
             var config = new AgentConfig
             {
@@ -90,7 +149,7 @@ namespace DirectoryAnalyzer.Agent
                 AnalyzerClientThumbprints = ReadRegistryValue("AnalyzerClientThumbprints", string.Empty)
                     .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries),
                 ActionTimeoutSeconds = ReadRegistryInt("ActionTimeoutSeconds", 30),
-                LogPath = ReadRegistryValue("LogPath", @"C:\ProgramData\DirectoryAnalyzer\agent.log"),
+                LogPath = ReadRegistryValue("LogPath", AgentConfig.DefaultLogPath()),
                 Domain = ReadRegistryValue("Domain", string.Empty),
                 MaxRequestBytes = ReadRegistryInt("MaxRequestBytes", 65536),
                 RequestClockSkewSeconds = ReadRegistryInt("RequestClockSkewSeconds", 300),
@@ -105,6 +164,9 @@ namespace DirectoryAnalyzer.Agent
                 RateLimitBackoffSeconds = ReadRegistryInt("RateLimitBackoffSeconds", 15)
             };
 
+            var applied = ApplyRegistryOverrides(config, out logPathSource);
+            overrides = applied;
+
             Directory.CreateDirectory(Path.GetDirectoryName(path) ?? AppDomain.CurrentDomain.BaseDirectory);
             using var stream = File.Create(path);
             var serializer = new DataContractJsonSerializer(typeof(AgentConfig));
@@ -112,18 +174,23 @@ namespace DirectoryAnalyzer.Agent
             return config;
         }
 
-        private static void ApplyRegistryOverrides(AgentConfig config)
+        private static IReadOnlyList<string> ApplyRegistryOverrides(AgentConfig config, out string logPathSource)
         {
+            var overrides = new List<string>();
+            logPathSource = string.Empty;
+
             var bindPrefix = ReadRegistryValue("BindPrefix", null);
             if (!string.IsNullOrWhiteSpace(bindPrefix))
             {
                 config.BindPrefix = bindPrefix;
+                overrides.Add("BindPrefix");
             }
 
             var certThumbprint = ReadRegistryValue("CertThumbprint", null);
             if (!string.IsNullOrWhiteSpace(certThumbprint))
             {
                 config.CertThumbprint = certThumbprint;
+                overrides.Add("CertThumbprint");
             }
 
             var analyzerThumbprints = ReadRegistryValue("AnalyzerClientThumbprints", null);
@@ -131,18 +198,22 @@ namespace DirectoryAnalyzer.Agent
             {
                 config.AnalyzerClientThumbprints = analyzerThumbprints
                     .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+                overrides.Add("AnalyzerClientThumbprints");
             }
 
             var logPath = ReadRegistryValue("LogPath", null);
             if (!string.IsNullOrWhiteSpace(logPath))
             {
                 config.LogPath = logPath;
+                overrides.Add("LogPath");
+                logPathSource = "Registry";
             }
 
             var domain = ReadRegistryValue("Domain", null);
             if (domain != null)
             {
                 config.Domain = domain;
+                overrides.Add("Domain");
             }
 
             config.ActionTimeoutSeconds = ReadRegistryInt("ActionTimeoutSeconds", config.ActionTimeoutSeconds);
@@ -157,6 +228,8 @@ namespace DirectoryAnalyzer.Agent
             config.MaxBurstRequests = ReadRegistryInt("MaxBurstRequests", config.MaxBurstRequests);
             config.BurstWindowSeconds = ReadRegistryInt("BurstWindowSeconds", config.BurstWindowSeconds);
             config.RateLimitBackoffSeconds = ReadRegistryInt("RateLimitBackoffSeconds", config.RateLimitBackoffSeconds);
+
+            return overrides;
         }
 
         private static string ReadRegistryValue(string name, string fallback)

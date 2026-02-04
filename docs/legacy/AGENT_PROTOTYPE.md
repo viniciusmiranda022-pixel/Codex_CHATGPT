@@ -3,9 +3,9 @@
 This prototype adds a Windows Service agent and a console Analyzer client with **one action**: `GetUsers`. It uses HTTPS over Schannel with **mutual TLS** (mTLS), request signing, anti-replay protections, and a strict allow-list of certificate thumbprints.
 
 > **Projects added**
-> * `AgentService` – Windows Service (DirectoryAnalyzer.Agent)
-> * `AnalyzerClient` – Console client (DirectoryAnalyzer.AnalyzerClient)
-> * `PrototypeConfigs` – sample JSON configuration files
+> * `AgentService`: Windows Service (DirectoryAnalyzer.Agent)
+> * `AnalyzerClient`: Console client (DirectoryAnalyzer.AnalyzerClient)
+> * `PrototypeConfigs`: sample JSON configuration files
 
 ---
 
@@ -74,12 +74,12 @@ netsh http add sslcert ipport=0.0.0.0:8443 `
 
 ## Configure JSON Settings
 
-1. Copy `PrototypeConfigs/agentsettings.json` to `C:\ProgramData\DirectoryAnalyzer\agentsettings.json`.
+1. Copy `PrototypeConfigs/agentsettings.json` to `%ProgramData%\DirectoryAnalyzerAgent\agentsettings.json`.
 2. Replace:
    * `CertThumbprint` with `$agentThumb`
    * `AnalyzerClientThumbprints` with `$clientThumb`
    * Tune `RequestClockSkewSeconds`, `ReplayCacheMinutes`, and rate limits as needed
-3. Copy `PrototypeConfigs/agentclientsettings.json` to `C:\ProgramData\DirectoryAnalyzer\agentclientsettings.json`.
+3. Copy `PrototypeConfigs/agentclientsettings.json` to `%ProgramData%\DirectoryAnalyzerAgent\agentclientsettings.json`.
 4. Replace:
    * `ClientCertThumbprint` with `$clientThumb`
    * `AllowedAgentThumbprints` with `$agentThumb`
@@ -159,7 +159,7 @@ jsmith | John Smith | Enabled=True
 
 ## WPF Integration (DirectoryAnalyzer)
 
-1. Copy `PrototypeConfigs/agentclientsettings.json` to `C:\ProgramData\DirectoryAnalyzer\agentclientsettings.json`.
+1. Copy `PrototypeConfigs/agentclientsettings.json` to `%ProgramData%\DirectoryAnalyzerAgent\agentclientsettings.json`.
 2. In the DirectoryAnalyzer UI, open **Agent Inventory**.
 3. Click **Executar** to run `GetUsers` through the agent.
 
@@ -188,7 +188,7 @@ msiexec /i Installer\bin\Release\DirectoryAnalyzer.Agent.msi /qn \
   BINDPREFIX="https://+:8443/agent/"
 ```
 
-After installation, update `C:\ProgramData\DirectoryAnalyzer\agentsettings.json` if needed and restart the service:
+After installation, update `%ProgramData%\DirectoryAnalyzerAgent\agentsettings.json` if needed and restart the service:
 ```powershell
 sc.exe stop DirectoryAnalyzerAgent
 sc.exe start DirectoryAnalyzerAgent

@@ -1,5 +1,7 @@
 # Directory Analyzer (Read-Only Active Directory Inventory)
 
+## Documentação consolidada
+Use `DOCS/01_OVERVIEW.md` como ponto de entrada da documentação atual.
 Directory Analyzer is a Windows desktop WPF application for read-only assessment and inventory of Active Directory and associated infrastructure (DNS, GPO, SMB, services, IIS, scheduled tasks, local profiles, local security policy, trusts, proxyAddresses, etc.). The project targets **.NET Framework 4.8** and must remain read-only: it only queries data and never changes Active Directory, GPOs, IIS, local policy, or system configuration.
 
 ## Prerequisites
@@ -39,11 +41,11 @@ The codebase is moving toward a consistent modular pattern:
 The DNS analyzer has been refactored to this pattern to serve as the template for other modules.
 
 ### Key Project Areas
-- `Modules/` — Collector interfaces and module-specific collectors.
-- `Models/` — Result models used by ViewModels and exports.
-- `ViewModels/` — MVVM ViewModels and command infrastructure.
-- `Services/` — Shared services (PowerShell, logging, exporting).
-- `*.xaml` + `*.xaml.cs` — WPF views; code-behind should only wire ViewModels.
+- `Modules/`: Collector interfaces and module-specific collectors.
+- `Models/`: Result models used by ViewModels and exports.
+- `ViewModels/`: MVVM ViewModels and command infrastructure.
+- `Services/`: Shared services (PowerShell, logging, exporting).
+- `*.xaml` + `*.xaml.cs`: WPF views; code-behind should only wire ViewModels.
 
 ## Logging
 Logging is centralized in `Services/LogService`.

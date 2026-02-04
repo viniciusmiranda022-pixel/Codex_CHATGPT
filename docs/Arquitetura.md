@@ -24,7 +24,7 @@ Documentar a arquitetura real do repositório, a estrutura da solução e como o
 | AgentService | Console/Service | `DirectoryAnalyzer.Agent.exe` | Host do agente (HttpListener) | `DirectoryAnalyzer.Agent.Contracts` |
 | AnalyzerClient | Console | `DirectoryAnalyzer.AnalyzerClient.exe` | Cliente de teste do agente | `DirectoryAnalyzer.Agent.Contracts` |
 | DirectoryAnalyzer.Agent.Installer | WiX | `DirectoryAnalyzer.Agent.msi` | Instalador do agente | `AgentService` output |
-| DirectoryAnalyzer.Agent.Contracts | Class Library | `DirectoryAnalyzer.Agent.Contracts.dll` | DTOs e assinatura | — |
+| DirectoryAnalyzer.Agent.Contracts | Class Library | `DirectoryAnalyzer.Agent.Contracts.dll` | DTOs e assinatura | N/A |
 | DirectoryAnalyzer.Agent | Console/Service | `DirectoryAnalyzer.Agent.exe` | Host do agente (SDK style) | `DirectoryAnalyzer.Agent.Contracts` |
 | DirectoryAnalyzer.Agent.Client | Class Library | `DirectoryAnalyzer.Agent.Client.dll` | Cliente do agente usado pela UI | `DirectoryAnalyzer.Agent.Contracts` |
 
@@ -83,9 +83,9 @@ Documentar a arquitetura real do repositório, a estrutura da solução e como o
 
 ## Configuração e carregamento
 * **Agent Mode (UI):** `AgentSettingsStore` resolve `agentclientsettings.json`.
-* **Agente:** `ConfigLoader` carrega `agentsettings.json` e sobrescreve via registry.
+* **Agente:** `AgentConfigLoader` carrega `agentsettings.json` e sobrescreve via registry.
 
-**Provas:** `Services/AgentSettings.cs`, `AgentService/AgentConfig.cs`.
+**Provas:** `Services/AgentSettings.cs`, `DirectoryAnalyzer.Agent.Contracts/AgentConfig.cs`.
 
 ## Ponteiros de código (provas)
 * Navegação e shell: `MainWindow.xaml`, `MainViewModel`.
@@ -94,7 +94,6 @@ Documentar a arquitetura real do repositório, a estrutura da solução e como o
 * Exportação: `ExportService.cs`.
 
 ## LIMITAÇÕES ATUAIS
-* **Desalinhamento de paths** entre instalador e resolver do agente.
 * **Duas implementações do host do agente** (AgentService e DirectoryAnalyzer.Agent) coexistem, o que pode confundir manutenção.
 
 ## COMO VALIDAR
