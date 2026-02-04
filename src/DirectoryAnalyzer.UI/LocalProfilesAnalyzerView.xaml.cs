@@ -17,7 +17,11 @@ namespace DirectoryAnalyzer.Views
 {
     public partial class LocalProfilesAnalyzerView : UserControl
     {
+ codex/transform-product-to-agent-only-architecture-xaez7h
         private readonly ModuleCollectionService _collectionService;
+
+        private readonly BrokerJobService _brokerJobService;
+ main
         private const string ModuleName = "LocalProfilesAnalyzer";
         private readonly ILogService _logService;
 
@@ -25,7 +29,11 @@ namespace DirectoryAnalyzer.Views
         {
             InitializeComponent();
             var settings = BrokerClientSettingsLoader.Load(BrokerClientSettingsStore.ResolvePath());
+ codex/transform-product-to-agent-only-architecture-xaez7h
             _collectionService = new ModuleCollectionService(new BrokerJobService(settings));
+
+            _brokerJobService = new BrokerJobService(settings);
+ main
             _logService = LogService.CreateLogger(ModuleName);
             UpdateStatus("✔️ Pronto para iniciar a coleta.", "Pronto");
             SetBusyState(false);
@@ -59,9 +67,58 @@ namespace DirectoryAnalyzer.Views
             
             try
             {
+ codex/transform-product-to-agent-only-architecture-xaez7h
                 var moduleResult = await _collectionService.RunLocalProfilesAsync(
                     scopeAttribute,
                     scopeValue,
+
+                // A lógica do script PowerShell permanece a mesma
+                string scriptText = @"
+                    param([string]$AttributeName, [string]$AttributeValue)
+                    Import-Module ActiveDirectory -ErrorAction SilentlyContinue; if (-not (Get-Module ActiveDirectory)) { throw 'Módulo ActiveDirectory não encontrado.' }
+                    try { $serverList = Get-ADComputer -Filter ""$AttributeName -eq '$AttributeValue'"" | Select-Object -ExpandProperty Name } catch { throw ""Falha ao buscar computadores no AD: $($_.Exception.Message)"" }
+                    if (-not $serverList) { Write-Warning ""Nenhum computador encontrado.""; return }
+
+                    $allProfiles = @()
+                    foreach ($serverName in $serverList) {
+                        if (-not (Test-Connection -ComputerName $serverName -Count 1 -Quiet -ErrorAction SilentlyContinue)) {
+                            $allProfiles += [PSCustomObject]@{ ComputerName = $serverName; AccountName = 'N/A'; SID = 'N/A'; LocalPath = 'ERRO DE CONEXÃO'; LastUseTime = $null }; continue
+                        }
+                        try {
+                            $profiles = Get-CimInstance -ClassName Win32_UserProfile -ComputerName $serverName -Filter 'Special = false' -ErrorAction Stop
+                            if (-not $profiles) { continue }
+                            foreach ($profile in $profiles) {
+                                $accountName = 'SID não resolvido'
+                                try {
+                                    $sidObject = New-Object System.Security.Principal.SecurityIdentifier($profile.SID)
+                                    $accountName = $sidObject.Translate([System.Security.Principal.NTAccount]).Value
+                                } catch { }
+                                
+                                $allProfiles += [PSCustomObject]@{
+                                    ComputerName = $serverName
+                                    AccountName = $accountName
+                                    SID = $profile.SID
+                                    LocalPath = $profile.LocalPath
+                                    LastUseTime = $profile.LastUseTime
+                                }
+                            }
+                        } catch {
+                            $allProfiles += [PSCustomObject]@{ ComputerName = $serverName; AccountName = 'N/A'; SID = 'N/A'; LocalPath = ""ERRO GERAL DE COLETA: $($_.Exception.Message)""; LastUseTime = $null }
+                        }
+                    }
+                    $allProfiles
+                ";
+                var scriptParameters = new Dictionary<string, string>
+                {
+                    { "AttributeName", scopeAttribute },
+                    { "AttributeValue", scopeValue }
+                };
+
+                var moduleResult = await _brokerJobService.RunPowerShellScriptAsync(
+                    ModuleName,
+                    scriptText,
+                    scriptParameters,
+ main
                     Environment.UserName,
                     CancellationToken.None);
 

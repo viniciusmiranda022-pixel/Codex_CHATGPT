@@ -17,7 +17,11 @@ namespace DirectoryAnalyzer.Views
 {
     public partial class LocalSecurityPolicyAnalyzerView : UserControl
     {
+ codex/transform-product-to-agent-only-architecture-xaez7h
         private readonly ModuleCollectionService _collectionService;
+
+        private readonly BrokerJobService _brokerJobService;
+ main
         private const string ModuleName = "LocalSecurityPolicyAnalyzer";
         private readonly ILogService _logService;
 
@@ -25,7 +29,11 @@ namespace DirectoryAnalyzer.Views
         {
             InitializeComponent();
             var settings = BrokerClientSettingsLoader.Load(BrokerClientSettingsStore.ResolvePath());
+ codex/transform-product-to-agent-only-architecture-xaez7h
             _collectionService = new ModuleCollectionService(new BrokerJobService(settings));
+
+            _brokerJobService = new BrokerJobService(settings);
+ main
             _logService = LogService.CreateLogger(ModuleName);
             UpdateStatus("✔️ Pronto para iniciar a coleta.", "Pronto");
             SetBusyState(false);
@@ -60,9 +68,113 @@ namespace DirectoryAnalyzer.Views
             try
             {
                 // A lógica do script PowerShell permanece a mesma
+ codex/transform-product-to-agent-only-architecture-xaez7h
                                 var moduleResult = await _collectionService.RunLocalSecurityPolicyAsync(
                     scopeAttribute,
                     scopeValue,
+
+                string scriptText = @"
+                    param([string]$AttributeName, [string]$AttributeValue)
+                    
+                    function Convert-PolicyValue {
+                        param($PolicyArea, $SettingName, $SettingValue)
+                        $returnObject = @{ Value = $SettingValue; Description = '' }
+                        try {
+                            switch ($PolicyArea) {
+                                'System Access' {
+                                    switch ($SettingName) {
+                                        'MinimumPasswordAge' { $returnObject.Value = ""$SettingValue dias""; $returnObject.Description = 'Tempo mínimo que uma senha deve ser mantida.' }; 'MaximumPasswordAge' { $returnObject.Value = ""$SettingValue dias""; $returnObject.Description = 'Tempo máximo de vida de uma senha.' }
+                                        'MinimumPasswordLength' { $returnObject.Value = if ($SettingValue -eq '0') { 'Não requer (0)' } else { ""$SettingValue caracteres"" }; $returnObject.Description = 'Número mínimo de caracteres da senha.' }
+                                        'PasswordHistorySize' { $returnObject.Value = if ($SettingValue -eq '0') { 'Nenhum histórico (0)' } else { ""$SettingValue senhas lembradas"" }; $returnObject.Description = 'Impede a reutilização de senhas recentes.' }
+                                        'LockoutBadCount' { $returnObject.Value = if ($SettingValue -eq '0') { 'Nenhum bloqueio (0)' } else { ""$SettingValue tentativas inválidas"" }; $returnObject.Description = 'Número de tentativas falhas antes de bloquear a conta.' }
+                                        'LockoutDuration' { $returnObject.Value = if ($SettingValue -eq '0') { 'Administrador deve desbloquear' } else { ""$SettingValue minutos"" }; $returnObject.Description = 'Duração do bloqueio da conta.' }
+                                        'PasswordComplexity' { $returnObject.Value = if ($SettingValue -eq '1') { 'Habilitada' } else { 'Desabilitada' }; $returnObject.Description = 'Exige complexidade (maiúsculas, minúsculas, números, etc).' }
+                                        'ClearTextPassword' { $returnObject.Value = if ($SettingValue -eq '1') { 'Habilitado (inseguro)' } else { 'Desabilitado' }; $returnObject.Description = 'Permite armazenar senhas de forma reversível.' }
+                                        'EnableAdminAccount' { $returnObject.Value = if ($SettingValue -eq '1') { 'Habilitada' } else { 'Desabilitada' }; $returnObject.Description = 'Status da conta de Administrador local padrão.' }
+                                        'EnableGuestAccount' { $returnObject.Value = if ($SettingValue -eq '1') { 'Habilitada' } else { 'Desabilitada' }; $returnObject.Description = 'Status da conta de Convidado (Guest) local padrão.' }
+                                    }
+                                }
+                                'Event Audit' {
+                                    $returnObject.Description = 'Define quais eventos são registrados no log de segurança.'
+                                    switch ($SettingValue) { '0' { $returnObject.Value = 'Sem Auditoria' }; '1' { $returnObject.Value = 'Sucesso' }; '2' { $returnObject.Value = 'Falha' }; '3' { $returnObject.Value = 'Sucesso e Falha' } }
+                                }
+                                'Privilege Rights' {
+                                    $returnObject.Description = 'Define quais contas/grupos podem executar ações privilegiadas.'
+                                    if ($SettingValue) {
+                                        $wellKnownSids = @{ 'S-1-5-32-544' = 'BUILTIN\Administrators'; 'S-1-5-32-545' = 'BUILTIN\Users'; 'S-1-5-18' = 'NT AUTHORITY\SYSTEM'; 'S-1-1-0' = 'Everyone'; 'S-1-5-11' = 'NT AUTHORITY\Authenticated Users' }
+                                        $resolvedNames = @(); $sids = $SettingValue.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+                                        foreach ($sidString in $sids) {
+                                            $cleanSid = $sidString.TrimStart('*'); try {
+                                                if ($wellKnownSids.ContainsKey($cleanSid)) { $resolvedNames += $wellKnownSids[$cleanSid] }
+                                                else { $sid = New-Object System.Security.Principal.SecurityIdentifier($cleanSid); $resolvedNames += $sid.Translate([System.Security.Principal.NTAccount]).Value }
+                                            } catch { $resolvedNames += $sidString }
+                                        }
+                                        $returnObject.Value = $resolvedNames -join ', '
+                                    }
+                                }
+                                'Registry Values' {
+                                    if ($SettingValue -match '^(\d+),(.*)$') {
+                                        $type = $matches[1]; $value = $matches[2].Trim('""'); $finalValue = $value; $translated = ''
+                                        if ($type -eq '4') {
+                                            $dwordValue = [System.Convert]::ToInt32($value, 10); $binMap = @{ 0 = 'Desabilitado'; 1 = 'Habilitado' }
+                                            $enabled = if ($binMap.ContainsKey($dwordValue)) { "" ($($binMap[$dwordValue]))"" } else { '' }
+                                            $translated = ""DWORD:$dwordValue$enabled""
+                                        } elseif ($type -eq '7') { $finalValue = $($value.Split([char]0,[char]44) -join '; ').Trim('; '); $translated = ""Multi-String: $finalValue"" }
+                                        else { $translated = ""String: $finalValue"" }
+                                        $returnObject.Value = $translated; $returnObject.Description = 'Configuração do registro do Windows.'
+                                    }
+                                }
+                            }
+                        } catch {}
+                        return $returnObject
+                    }
+
+                    Import-Module ActiveDirectory -ErrorAction SilentlyContinue; if (-not (Get-Module ActiveDirectory)) { throw 'Módulo ActiveDirectory não encontrado.' }
+                    try { $serverList = Get-ADComputer -Filter ""$AttributeName -eq '$AttributeValue'"" | Select-Object -ExpandProperty Name } catch { throw ""Falha ao buscar computadores no AD: $($_.Exception.Message)"" }
+                    if (-not $serverList) { return }
+
+                    $allResults = foreach ($serverName in $serverList) {
+                        if (-not (Test-Connection -ComputerName $serverName -Count 1 -Quiet -ErrorAction SilentlyContinue)) {
+                            [PSCustomObject]@{ ComputerName = $serverName; PolicyArea = 'Erro'; SettingName = 'Conexão'; SettingValue = 'Servidor inacessível (ping falhou)'; Descricao = '' }; continue
+                        }
+                        $scriptBlock = {
+                            $tempFile = Join-Path $env:TEMP ""$(New-Guid).inf""
+                            try { 
+                                secedit.exe /export /cfg $tempFile /quiet
+                                if (Test-Path $tempFile) { Get-Content -Path $tempFile -Encoding Unicode }
+                            } finally { if (Test-Path $tempFile) { Remove-Item -Path $tempFile -Force } }
+                        }
+                        try {
+                            $infContent = Invoke-Command -ComputerName $serverName -ScriptBlock $scriptBlock -ErrorAction Stop
+                            $currentArea = 'N/A'
+                            foreach($line in $infContent){
+                                if($line -match '^\[(.*)\]$'){ $currentArea = $matches[1].Trim() }
+                                elseif($line -match '^(.*?)\s*=\s*(.*)$'){
+                                    $settingName = $matches[1].Trim(); $rawSettingValue = $matches[2].Trim()
+                                    $translationObject = Convert-PolicyValue -PolicyArea $currentArea -SettingName $settingName -SettingValue $rawSettingValue
+                                    [PSCustomObject]@{
+                                        ComputerName = $serverName; PolicyArea = $currentArea; SettingName = $settingName;
+                                        SettingValue = $translationObject.Value; Descricao = $translationObject.Description
+                                    }
+                                }
+                            }
+                        } catch {
+                            [PSCustomObject]@{ ComputerName = $serverName; PolicyArea = 'Erro'; SettingName = 'Execução Remota'; SettingValue = ""ERRO GERAL DE COLETA: $($_.Exception.Message)""; Descricao = '' }
+                        }
+                    }
+                    $allResults
+                ";
+                var scriptParameters = new Dictionary<string, string>
+                {
+                    { "AttributeName", scopeAttribute },
+                    { "AttributeValue", scopeValue }
+                };
+
+                var moduleResult = await _brokerJobService.RunPowerShellScriptAsync(
+                    ModuleName,
+                    scriptText,
+                    scriptParameters,
+ main
                     Environment.UserName,
                     CancellationToken.None);
 

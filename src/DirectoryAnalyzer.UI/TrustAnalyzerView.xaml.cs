@@ -17,7 +17,11 @@ namespace DirectoryAnalyzer.Views
 {
     public partial class TrustsAnalyzerView : UserControl
     {
+ codex/transform-product-to-agent-only-architecture-xaez7h
         private readonly ModuleCollectionService _collectionService;
+
+        private readonly BrokerJobService _brokerJobService;
+ main
         private const string ModuleName = "TrustsAnalyzer";
         private readonly ILogService _logService;
 
@@ -25,7 +29,11 @@ namespace DirectoryAnalyzer.Views
         {
             InitializeComponent();
             var settings = BrokerClientSettingsLoader.Load(BrokerClientSettingsStore.ResolvePath());
+ codex/transform-product-to-agent-only-architecture-xaez7h
             _collectionService = new ModuleCollectionService(new BrokerJobService(settings));
+
+            _brokerJobService = new BrokerJobService(settings);
+ main
             _logService = LogService.CreateLogger(ModuleName);
             UpdateStatus("✔️ Pronto para iniciar a coleta.", "Pronto");
             SetBusyState(false);
@@ -47,7 +55,21 @@ namespace DirectoryAnalyzer.Views
             
             try
             {
+ codex/transform-product-to-agent-only-architecture-xaez7h
                 var moduleResult = await _collectionService.RunTrustsAsync(
+
+                // A lógica do script PowerShell permanece a mesma
+                string scriptText = @"
+                    Import-Module ActiveDirectory -ErrorAction SilentlyContinue
+                    if (-not (Get-Module ActiveDirectory)) { throw 'Módulo ActiveDirectory não encontrado.' }
+                    Get-ADTrust -Filter * | Select-Object Source, Target, Direction, TrustType, IsTransitive
+                ";
+
+                var moduleResult = await _brokerJobService.RunPowerShellScriptAsync(
+                    ModuleName,
+                    scriptText,
+                    null,
+ main
                     Environment.UserName,
                     CancellationToken.None);
 

@@ -14,12 +14,20 @@ using DirectoryAnalyzer.Services;
 using Microsoft.Win32;
 using System.IO;
 using System.Xml;
+ codex/transform-product-to-agent-only-architecture-xaez7h
+
+using System.Management.Automation;
+ main
 
 namespace DirectoryAnalyzer.Views
 {
     public partial class GpoAnalyzerView : UserControl
     {
+ codex/transform-product-to-agent-only-architecture-xaez7h
         private readonly ModuleCollectionService _collectionService;
+
+        private readonly BrokerJobService _brokerJobService;
+ main
         private const string ModuleName = "GpoAnalyzer";
         private readonly ILogService _logService;
 
@@ -27,7 +35,11 @@ namespace DirectoryAnalyzer.Views
         {
             InitializeComponent();
             var settings = BrokerClientSettingsLoader.Load(BrokerClientSettingsStore.ResolvePath());
+ codex/transform-product-to-agent-only-architecture-xaez7h
             _collectionService = new ModuleCollectionService(new BrokerJobService(settings));
+
+            _brokerJobService = new BrokerJobService(settings);
+ main
             _logService = LogService.CreateLogger(ModuleName);
             UpdateStatus("✔️ Pronto para iniciar a coleta.", "Pronto");
             SetBusyState(false);
@@ -49,7 +61,68 @@ namespace DirectoryAnalyzer.Views
 
             try
             {
+ codex/transform-product-to-agent-only-architecture-xaez7h
                 var moduleResult = await _collectionService.RunGpoAsync(
+
+                // A lógica de coleta de dados permanece a mesma
+                string scriptText = @"
+                    Import-Module GroupPolicy -ErrorAction SilentlyContinue
+                    Import-Module ActiveDirectory -ErrorAction SilentlyContinue
+                    if (-not (Get-Module GroupPolicy)) { throw 'Módulo GroupPolicy não encontrado.' }
+
+                    $gpoResumo = @()
+                    $gpoLinks = @()
+                    $gpoDelegacoes = @()
+                    $gpoSecurityFiltering = @()
+                    $gpoWmiFilters = @()
+
+                    $gpos = Get-GPO -All
+                    if (-not $gpos) { return }
+
+                    foreach ($gpo in $gpos) {
+                        $guid = $gpo.Id.ToString()
+                        $nome = $gpo.DisplayName
+                        
+                        $wmiNome = if($gpo.WmiFilter) { $gpo.WmiFilter.Name } else { 'Nenhum' }
+                        $gpoWmiFilters += [pscustomobject]@{ GPO_Nome = $nome; GPO_GUID = $guid; WMIFilterNome = $wmiNome; WMIQuery = if($gpo.WmiFilter) { $gpo.WmiFilter.Query } else { 'N/A' } }
+                        $gpoResumo += [pscustomobject]@{ Nome = $nome; GUID = $guid; Status = $gpo.GpoStatus.ToString(); CriadoEm = $gpo.CreationTime; ModificadoEm = $gpo.ModificationTime; FiltroWMINome = $wmiNome }
+
+                        try {
+                            $report = Get-GPOReport -Guid $guid -ReportType Xml -ErrorAction Stop
+                            [xml]$xmlDoc = $report
+
+                            if ($xmlDoc.GPO.LinksTo.SOMObject) {
+                                foreach ($som in $xmlDoc.GPO.LinksTo.SOMObject) {
+                                    $gpoLinks += [pscustomobject]@{ GPO_Nome = $nome; VinculadoEm_DN = $som.SOMPath; LinkHabilitado = $som.Enabled; LinkForcado = $som.NoOverride }
+                                }
+                            } elseif ($xmlDoc.GPO.LinksTo.SOMPath) {
+                               $gpoLinks += [pscustomobject]@{ GPO_Nome = $nome; VinculadoEm_DN = $xmlDoc.GPO.LinksTo.SOMPath; LinkHabilitado = $xmlDoc.GPO.LinksTo.Enabled; LinkForcado = $xmlDoc.GPO.LinksTo.NoOverride }
+                            }
+
+                            $perms = Get-GPPermission -Guid $guid -All -ErrorAction Stop
+                            foreach ($perm in $perms) {
+                                $gpoDelegacoes += [pscustomobject]@{ GPO_Nome = $nome; Trustee = $perm.Trustee.Name; Permissao = $perm.Permission.ToString() }
+                                if ($perm.Permission -eq 'GpoApply' -or $perm.Permission -eq 'GpoRead') {
+                                    $gpoSecurityFiltering += [pscustomobject]@{ GPO_Nome = $nome; FiltroSeguranca = $perm.Trustee.Name; PermissaoFiltro = $perm.Permission.ToString() }
+                                }
+                            }
+                        } catch { }
+                    }
+                    
+                    [PSCustomObject]@{
+                        ResumoJson = ($gpoResumo | ConvertTo-Json -Depth 6);
+                        LinksJson = ($gpoLinks | ConvertTo-Json -Depth 6);
+                        DelegacoesJson = ($gpoDelegacoes | ConvertTo-Json -Depth 6);
+                        SecurityFilteringJson = ($gpoSecurityFiltering | ConvertTo-Json -Depth 6);
+                        WmiFiltersJson = ($gpoWmiFilters | ConvertTo-Json -Depth 6)
+                    }
+                ";
+
+                var moduleResult = await _brokerJobService.RunPowerShellScriptAsync(
+                    ModuleName,
+                    scriptText,
+                    null,
+ main
                     Environment.UserName,
                     CancellationToken.None);
 

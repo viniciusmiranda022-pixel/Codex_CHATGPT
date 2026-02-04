@@ -17,7 +17,11 @@ namespace DirectoryAnalyzer.Views
 {
     public partial class SmbAnalyzerView : UserControl
     {
+ codex/transform-product-to-agent-only-architecture-xaez7h
         private readonly ModuleCollectionService _collectionService;
+
+        private readonly BrokerJobService _brokerJobService;
+ main
         private const string ModuleName = "SmbSharesAnalyzer";
         private readonly ILogService _logService;
 
@@ -25,7 +29,11 @@ namespace DirectoryAnalyzer.Views
         {
             InitializeComponent();
             var settings = BrokerClientSettingsLoader.Load(BrokerClientSettingsStore.ResolvePath());
+ codex/transform-product-to-agent-only-architecture-xaez7h
             _collectionService = new ModuleCollectionService(new BrokerJobService(settings));
+
+            _brokerJobService = new BrokerJobService(settings);
+ main
             _logService = LogService.CreateLogger(ModuleName);
             UpdateStatus("✔️ Pronto para iniciar a coleta.", "Pronto");
             SetBusyState(false);
@@ -59,9 +67,45 @@ namespace DirectoryAnalyzer.Views
             
             try
             {
+ codex/transform-product-to-agent-only-architecture-xaez7h
                 var moduleResult = await _collectionService.RunSmbSharesAsync(
                     scopeAttribute,
                     scopeValue,
+
+                string scriptText = @"
+                    param([string]$AttributeName, [string]$AttributeValue)
+                    Import-Module ActiveDirectory -ErrorAction SilentlyContinue; if (-not (Get-Module ActiveDirectory)) { throw 'Módulo ActiveDirectory não encontrado.' }
+                    try { $serverList = Get-ADComputer -Filter ""$AttributeName -eq '$AttributeValue'"" | Select-Object -ExpandProperty Name } catch { throw ""Falha ao buscar computadores no AD: $($_.Exception.Message)"" }
+                    if (-not $serverList) { Write-Warning ""Nenhum computador encontrado.""; return }
+                    $allResults = foreach ($serverName in $serverList) {
+                        if (-not (Test-Connection -ComputerName $serverName -Count 1 -Quiet -ErrorAction SilentlyContinue)) {
+                            [PSCustomObject]@{ ComputerName = $serverName; ShareName = 'N/A'; SharePath = 'N/A'; IdentityReference = 'ERRO DE CONEXÃO'; AccessControlType = 'Servidor inacessível (ping falhou)'; FileSystemRights = 'N/A'; IsInherited = $false }; continue
+                        }
+                        $scriptBlock = {
+                            $localResults = @(); $shares = Get-CimInstance -ClassName Win32_Share -ErrorAction SilentlyContinue | Where-Object { $_.Type -eq 0 -and $_.Name -notlike '*$' };
+                            if ($shares) { foreach ($share in $shares) {
+                                $folderPath = $share.Path; if(-not ([string]::IsNullOrWhiteSpace($folderPath))) {
+                                    try { $acl = Get-Acl -Path $folderPath -ErrorAction Stop; foreach ($ace in $acl.Access) { $localResults += [PSCustomObject]@{ ComputerName = $env:COMPUTERNAME; ShareName = $share.Name; SharePath = $share.Path; IdentityReference = $ace.IdentityReference.Value; AccessControlType = $ace.AccessControlType.ToString(); FileSystemRights = $ace.FileSystemRights.ToString(); IsInherited = $ace.IsInherited } }
+                                    } catch { $localResults += [PSCustomObject]@{ ComputerName = $env:COMPUTERNAME; ShareName = $share.Name; SharePath = $share.Path; IdentityReference = ""ERRO DE ACESSO LOCAL ÀS PERMISSÕES""; AccessControlType = $_.Exception.Message; FileSystemRights = 'N/A'; IsInherited = $false } }
+                                }
+                            } }
+                            return $localResults
+                        }
+                        try { Invoke-Command -ComputerName $serverName -ScriptBlock $scriptBlock -ErrorAction Stop } catch { [PSCustomObject]@{ ComputerName = $serverName; ShareName = 'N/A'; SharePath = 'N/A'; IdentityReference = 'ERRO DE EXECUÇÃO REMOTA (Invoke-Command)'; AccessControlType = $_.Exception.Message; FileSystemRights = 'N/A'; IsInherited = $false } }
+                    }
+                    $allResults
+                ";
+                var scriptParameters = new Dictionary<string, string>
+                {
+                    { "AttributeName", scopeAttribute },
+                    { "AttributeValue", scopeValue }
+                };
+
+                var moduleResult = await _brokerJobService.RunPowerShellScriptAsync(
+                    ModuleName,
+                    scriptText,
+                    scriptParameters,
+ main
                     Environment.UserName,
                     CancellationToken.None);
 

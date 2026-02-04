@@ -12,7 +12,11 @@ namespace DirectoryAnalyzer.Modules.Dns
 {
     public class DnsCollector : ICollector<DnsReport>
     {
+ codex/transform-product-to-agent-only-architecture-xaez7h
         private readonly ModuleCollectionService _collectionService;
+
+        private readonly BrokerJobService _brokerJobService;
+ main
         private readonly ILogService _logService;
         private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
         {
@@ -21,7 +25,11 @@ namespace DirectoryAnalyzer.Modules.Dns
 
         public DnsCollector(BrokerJobService brokerJobService, ILogService logService)
         {
+ codex/transform-product-to-agent-only-architecture-xaez7h
             _collectionService = new ModuleCollectionService(brokerJobService ?? throw new ArgumentNullException(nameof(brokerJobService)));
+
+            _brokerJobService = brokerJobService ?? throw new ArgumentNullException(nameof(brokerJobService));
+ main
             _logService = logService ?? throw new ArgumentNullException(nameof(logService));
         }
 
@@ -30,7 +38,61 @@ namespace DirectoryAnalyzer.Modules.Dns
             progress?.Report("Conectando ao DNS...");
             _logService.Info("Iniciando coleta completa de DNS.");
 
+ codex/transform-product-to-agent-only-architecture-xaez7h
             var moduleResult = await _collectionService.RunDnsAsync(Environment.UserName, cancellationToken);
+
+            string scriptText = @"
+                Import-Module DnsServer -ErrorAction SilentlyContinue
+                if (-not (Get-Module DnsServer)) { throw 'Módulo DnsServer não encontrado.' }
+                $pdc = (Get-ADDomainController -Discover -Service PrimaryDC).HostName
+
+                $zonas = Get-DnsServerZone -ComputerName $pdc | Select-Object ZoneName, ZoneType, IsReverseLookupZone, DynamicUpdate
+                $forwarders = Get-DnsServerForwarder -ComputerName $pdc | Select-Object @{N='IPAddress';E={($_.IPAddress | ForEach-Object { $_.IPAddressToString }) -join '; '}}, UseRootHint, EnableReordering, Timeout
+
+                $allRecords = @()
+                foreach($zone in $zonas){
+                    $recordsInZone = Get-DnsServerResourceRecord -ZoneName $zone.ZoneName -ComputerName $pdc -ErrorAction SilentlyContinue
+                    if($recordsInZone){
+                        foreach ($record in $recordsInZone) {
+                            $recordDataValue = 'N/A'
+                            if ($record.RecordData) {
+                                switch($record.RecordType){
+                                    'A'     { $recordDataValue = '' + $record.RecordData.IPV4Address }
+                                    'AAAA'  { $recordDataValue = '' + $record.RecordData.IPV6Address }
+                                    'CNAME' { $recordDataValue = $record.RecordData.HostNameAlias }
+                                    'MX'    { $recordDataValue = ""$($record.RecordData.MailExchange) (Pref: $($record.RecordData.Preference))"" }
+                                    'NS'    { $recordDataValue = $record.RecordData.NameServer }
+                                    'PTR'   { $recordDataValue = $record.RecordData.PtrDomainName }
+                                    'SRV'   { $recordDataValue = ""$($record.RecordData.DomainName):$($record.RecordData.Port)"" }
+                                    'SOA'   { $recordDataValue = ""Servidor Principal: $($record.RecordData.PrimaryServer)"" }
+                                    default { $recordDataValue = ""Tipo não mapeado: $($record.RecordType)"" }
+                                }
+                            }
+                            $allRecords += [PSCustomObject]@{
+                                ZoneName   = $zone.ZoneName
+                                HostName   = [string]$record.HostName
+                                RecordType = [string]$record.RecordType
+                                TimeToLive = [string]$record.TimeToLive
+                                RecordData = $recordDataValue
+                            }
+                        }
+                    }
+                }
+
+                [PSCustomObject]@{
+                    ZonasJson = ($zonas | ConvertTo-Json -Depth 6)
+                    RegistrosJson = ($allRecords | ConvertTo-Json -Depth 6)
+                    EncaminhadoresJson = ($forwarders | ConvertTo-Json -Depth 6)
+                }
+            ";
+
+            var moduleResult = await _brokerJobService.RunPowerShellScriptAsync(
+                "DnsAnalyzer",
+                scriptText,
+                null,
+                Environment.UserName,
+                cancellationToken);
+ main
             var report = new DnsReport();
 
             if (moduleResult?.Items?.Count > 0)

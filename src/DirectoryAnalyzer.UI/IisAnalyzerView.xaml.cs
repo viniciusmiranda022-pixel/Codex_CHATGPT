@@ -17,7 +17,11 @@ namespace DirectoryAnalyzer.Views
 {
     public partial class IisAppPoolsAnalyzerView : UserControl
     {
+ codex/transform-product-to-agent-only-architecture-xaez7h
         private readonly ModuleCollectionService _collectionService;
+
+        private readonly BrokerJobService _brokerJobService;
+ main
         private const string ModuleName = "IisAppPoolsAnalyzer";
         private readonly ILogService _logService;
 
@@ -25,7 +29,11 @@ namespace DirectoryAnalyzer.Views
         {
             InitializeComponent();
             var settings = BrokerClientSettingsLoader.Load(BrokerClientSettingsStore.ResolvePath());
+ codex/transform-product-to-agent-only-architecture-xaez7h
             _collectionService = new ModuleCollectionService(new BrokerJobService(settings));
+
+            _brokerJobService = new BrokerJobService(settings);
+ main
             _logService = LogService.CreateLogger(ModuleName);
             UpdateStatus("✔️ Pronto para iniciar a coleta.", "Pronto");
             SetBusyState(false);
@@ -60,9 +68,66 @@ namespace DirectoryAnalyzer.Views
             try
             {
                 // A lógica do script PowerShell permanece a mesma
+ codex/transform-product-to-agent-only-architecture-xaez7h
                                 var moduleResult = await _collectionService.RunIisAppPoolsAsync(
                     scopeAttribute,
                     scopeValue,
+
+                string scriptText = @"
+                    param([string]$AttributeName, [string]$AttributeValue)
+                    Import-Module ActiveDirectory -ErrorAction SilentlyContinue; if (-not (Get-Module ActiveDirectory)) { throw 'Módulo ActiveDirectory não encontrado.' }
+                    try { $serverList = Get-ADComputer -Filter ""$AttributeName -eq '$AttributeValue'"" | Select-Object -ExpandProperty Name } catch { throw ""Falha ao buscar computadores no AD: $($_.Exception.Message)"" }
+                    if (-not $serverList) { return }
+
+                    $allResults = foreach ($serverName in $serverList) {
+                        if (-not (Test-Connection -ComputerName $serverName -Count 1 -Quiet -ErrorAction SilentlyContinue)) {
+                            [PSCustomObject]@{ ComputerName = $serverName; ApplicationPool = 'ERRO DE CONEXÃO'; Status = 'N/A'; CustomIdentity = 'Servidor inacessível'; SitesVinculados = 'N/A' }; continue
+                        }
+                        
+                        $scriptBlock = {
+                            if (-not (Get-Module WebAdministration -ListAvailable)) {
+                                return [PSCustomObject]@{ ComputerName = $env:COMPUTERNAME; ApplicationPool = 'ERRO DE MÓDULO'; Status = 'N/A'; CustomIdentity = 'Módulo WebAdministration não encontrado'; SitesVinculados = 'N/A' }
+                            }
+                            Import-Module WebAdministration
+                            
+                            try {
+                                $pools = Get-ChildItem IIS:\AppPools -ErrorAction Stop
+                                $sites = Get-Website -ErrorAction Stop
+                            } catch {
+                                return [PSCustomObject]@{ ComputerName = $env:COMPUTERNAME; ApplicationPool = 'ERRO DE COLETA IIS'; Status = 'N/A'; CustomIdentity = 'Falha ao executar Get-ChildItem ou Get-Website. O IIS está instalado e rodando?'; SitesVinculados = 'N/A' }
+                            }
+                            
+                            foreach ($pool in $pools) {
+                                $vinculados = $sites | Where-Object { $_.applicationPool -eq $pool.Name } | Select-Object -ExpandProperty Name
+                                [PSCustomObject]@{
+                                    ComputerName = $env:COMPUTERNAME
+                                    ApplicationPool = $pool.Name
+                                    Status = $pool.State
+                                    CustomIdentity = if ($pool.processModel.identityType -eq 'SpecificUser') { $pool.processModel.userName } else { $pool.processModel.identityType }
+                                    SitesVinculados = if ($vinculados) { $vinculados -join ', ' } else { 'Nenhum' }
+                                }
+                            }
+                        }
+
+                        try {
+                            Invoke-Command -ComputerName $serverName -ScriptBlock $scriptBlock -ErrorAction Stop
+                        } catch {
+                            [PSCustomObject]@{ ComputerName = $serverName; ApplicationPool = 'ERRO DE EXECUÇÃO REMOTA'; Status = 'N/A'; CustomIdentity = $_.Exception.Message; SitesVinculados = 'N/A' }
+                        }
+                    }
+                    $allResults
+                ";
+                var scriptParameters = new Dictionary<string, string>
+                {
+                    { "AttributeName", scopeAttribute },
+                    { "AttributeValue", scopeValue }
+                };
+
+                var moduleResult = await _brokerJobService.RunPowerShellScriptAsync(
+                    ModuleName,
+                    scriptText,
+                    scriptParameters,
+ main
                     Environment.UserName,
                     CancellationToken.None);
 

@@ -17,7 +17,11 @@ namespace DirectoryAnalyzer.Views
 {
     public partial class ProxyAddressAnalyzerView : UserControl
     {
+ codex/transform-product-to-agent-only-architecture-xaez7h
         private readonly ModuleCollectionService _collectionService;
+
+        private readonly BrokerJobService _brokerJobService;
+ main
         private const string ModuleName = "ProxyAddressAnalyzer";
         private readonly ILogService _logService;
 
@@ -25,7 +29,11 @@ namespace DirectoryAnalyzer.Views
         {
             InitializeComponent();
             var settings = BrokerClientSettingsLoader.Load(BrokerClientSettingsStore.ResolvePath());
+ codex/transform-product-to-agent-only-architecture-xaez7h
             _collectionService = new ModuleCollectionService(new BrokerJobService(settings));
+
+            _brokerJobService = new BrokerJobService(settings);
+ main
             _logService = LogService.CreateLogger(ModuleName);
             UpdateStatus("✔️ Pronto para iniciar a coleta.", "Pronto");
             SetBusyState(false);
@@ -59,9 +67,45 @@ namespace DirectoryAnalyzer.Views
 
             try
             {
+ codex/transform-product-to-agent-only-architecture-xaez7h
                 var moduleResult = await _collectionService.RunProxyAddressesAsync(
                     scopeAttribute,
                     scopeValue,
+
+                // A lógica do script PowerShell permanece a mesma
+                string scriptText = @"
+                    param([string]$AttributeName, [string]$AttributeValue)
+                    Import-Module ActiveDirectory -ErrorAction SilentlyContinue; if (-not (Get-Module ActiveDirectory)) { throw 'Módulo ActiveDirectory não encontrado.' }
+                    $filter = ""($AttributeName -eq '$AttributeValue') -and (ProxyAddresses -like '*')""
+                    
+                    $users = Get-ADUser -Filter $filter -Properties ProxyAddresses, UserPrincipalName, SamAccountName
+                    if (-not $users) { return }
+
+                    $flatList = @()
+                    foreach ($user in $users) {
+                        foreach ($address in $user.ProxyAddresses) {
+                            $isPrimary = if ($address -clike 'SMTP:*') { $true } else { $false }
+                            $flatList += [PSCustomObject]@{
+                                UserPrincipalName = $user.UserPrincipalName
+                                SamAccountName    = $user.SamAccountName
+                                ProxyAddress      = $address.ToString()
+                                IsPrimarySmtp     = $isPrimary
+                            }
+                        }
+                    }
+                    return $flatList
+                ";
+                var scriptParameters = new Dictionary<string, string>
+                {
+                    { "AttributeName", scopeAttribute },
+                    { "AttributeValue", scopeValue }
+                };
+
+                var moduleResult = await _brokerJobService.RunPowerShellScriptAsync(
+                    ModuleName,
+                    scriptText,
+                    scriptParameters,
+ main
                     Environment.UserName,
                     CancellationToken.None);
 
