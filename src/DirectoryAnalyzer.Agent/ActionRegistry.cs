@@ -33,7 +33,20 @@ namespace DirectoryAnalyzer.Agent
                 { "GetComputers", GetComputersAsync },
                 { "GetGpos", GetGposAsync },
                 { "GetDnsZones", GetDnsZonesAsync },
+ codex/transform-product-to-agent-only-architecture-xaez7h
+                { "ScheduledTasksAnalyzer", (request, config, token) => RunPowerShellModuleAsync(\"ScheduledTasksAnalyzer\", request, config, token) },
+                { "SmbSharesAnalyzer", (request, config, token) => RunPowerShellModuleAsync(\"SmbSharesAnalyzer\", request, config, token) },
+                { "InstalledServicesAnalyzer", (request, config, token) => RunPowerShellModuleAsync(\"InstalledServicesAnalyzer\", request, config, token) },
+                { "LocalProfilesAnalyzer", (request, config, token) => RunPowerShellModuleAsync(\"LocalProfilesAnalyzer\", request, config, token) },
+                { "LocalSecurityPolicyAnalyzer", (request, config, token) => RunPowerShellModuleAsync(\"LocalSecurityPolicyAnalyzer\", request, config, token) },
+                { "IisAppPoolsAnalyzer", (request, config, token) => RunPowerShellModuleAsync(\"IisAppPoolsAnalyzer\", request, config, token) },
+                { "ProxyAddressAnalyzer", (request, config, token) => RunPowerShellModuleAsync(\"ProxyAddressAnalyzer\", request, config, token) },
+                { "TrustsAnalyzer", (request, config, token) => RunPowerShellModuleAsync(\"TrustsAnalyzer\", request, config, token) },
+                { "GpoAnalyzer", (request, config, token) => RunPowerShellModuleAsync(\"GpoAnalyzer\", request, config, token) },
+                { "DnsAnalyzer", (request, config, token) => RunPowerShellModuleAsync(\"DnsAnalyzer\", request, config, token) }
+
                 { "RunPowerShellScript", RunPowerShellScriptAsync }
+ main
             };
         }
 
@@ -295,6 +308,17 @@ namespace DirectoryAnalyzer.Agent
             return Task.FromResult(AgentResponse.Success(request.RequestId, stopwatch.ElapsedMilliseconds, results));
         }
 
+ codex/transform-product-to-agent-only-architecture-xaez7h
+        private Task<AgentResponse> RunPowerShellModuleAsync(string moduleName, AgentRequest request, AgentConfig config, CancellationToken token)
+        {
+            var scriptText = PowerShellScripts.GetScriptForModule(moduleName);
+            if (string.IsNullOrWhiteSpace(scriptText))
+            {
+                return Task.FromResult(AgentResponse.Failed(request.RequestId, "UnknownModule", "Module not supported."));
+            }
+
+            var parameters = request.Parameters ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
         private Task<AgentResponse> RunPowerShellScriptAsync(AgentRequest request, AgentConfig config, CancellationToken token)
         {
             if (!request.Parameters.TryGetValue("Script", out var scriptText) || string.IsNullOrWhiteSpace(scriptText))
@@ -313,6 +337,7 @@ namespace DirectoryAnalyzer.Agent
                 parameters[pair.Key] = pair.Value;
             }
 
+ main
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var results = _powerShellCollector.Execute(scriptText, parameters, out var errors);
             stopwatch.Stop();

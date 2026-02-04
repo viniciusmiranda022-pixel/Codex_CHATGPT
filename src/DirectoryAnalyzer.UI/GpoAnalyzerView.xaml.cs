@@ -14,13 +14,20 @@ using DirectoryAnalyzer.Services;
 using Microsoft.Win32;
 using System.IO;
 using System.Xml;
+ codex/transform-product-to-agent-only-architecture-xaez7h
+
 using System.Management.Automation;
+ main
 
 namespace DirectoryAnalyzer.Views
 {
     public partial class GpoAnalyzerView : UserControl
     {
+ codex/transform-product-to-agent-only-architecture-xaez7h
+        private readonly ModuleCollectionService _collectionService;
+
         private readonly BrokerJobService _brokerJobService;
+ main
         private const string ModuleName = "GpoAnalyzer";
         private readonly ILogService _logService;
 
@@ -28,7 +35,11 @@ namespace DirectoryAnalyzer.Views
         {
             InitializeComponent();
             var settings = BrokerClientSettingsLoader.Load(BrokerClientSettingsStore.ResolvePath());
+ codex/transform-product-to-agent-only-architecture-xaez7h
+            _collectionService = new ModuleCollectionService(new BrokerJobService(settings));
+
             _brokerJobService = new BrokerJobService(settings);
+ main
             _logService = LogService.CreateLogger(ModuleName);
             UpdateStatus("✔️ Pronto para iniciar a coleta.", "Pronto");
             SetBusyState(false);
@@ -50,6 +61,9 @@ namespace DirectoryAnalyzer.Views
 
             try
             {
+ codex/transform-product-to-agent-only-architecture-xaez7h
+                var moduleResult = await _collectionService.RunGpoAsync(
+
                 // A lógica de coleta de dados permanece a mesma
                 string scriptText = @"
                     Import-Module GroupPolicy -ErrorAction SilentlyContinue
@@ -108,6 +122,7 @@ namespace DirectoryAnalyzer.Views
                     ModuleName,
                     scriptText,
                     null,
+ main
                     Environment.UserName,
                     CancellationToken.None);
 
