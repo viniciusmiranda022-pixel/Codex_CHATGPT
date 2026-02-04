@@ -1,6 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.Serialization;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
 
 namespace DirectoryAnalyzer.AgentContracts
 {
@@ -15,6 +19,15 @@ namespace DirectoryAnalyzer.AgentContracts
 
         [DataMember(Order = 3)]
         public Dictionary<string, string> Parameters { get; set; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        [DataMember(Order = 4)]
+        public long TimestampUnixSeconds { get; set; }
+
+        [DataMember(Order = 5)]
+        public string Nonce { get; set; } = string.Empty;
+
+        [DataMember(Order = 6)]
+        public string Signature { get; set; } = string.Empty;
     }
 
     [DataContract]
@@ -108,5 +121,87 @@ namespace DirectoryAnalyzer.AgentContracts
 
         [DataMember(Order = 3)]
         public bool Enabled { get; set; }
+    }
+
+    public static class AgentRequestSigner
+    {
+        public static string Sign(AgentRequest request, X509Certificate2 certificate)
+        {
+            if (request == null)
+            {
+                throw new ArgumentNullException(nameof(request));
+            }
+
+            if (certificate == null)
+            {
+                throw new ArgumentNullException(nameof(certificate));
+            }
+
+            var payload = Encoding.UTF8.GetBytes(BuildPayload(request));
+            var rsa = certificate.GetRSAPrivateKey();
+            if (rsa != null)
+            {
+                var signature = rsa.SignData(payload, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+                return Convert.ToBase64String(signature);
+            }
+
+            var ecdsa = certificate.GetECDsaPrivateKey();
+            if (ecdsa != null)
+            {
+                var signature = ecdsa.SignData(payload, HashAlgorithmName.SHA256);
+                return Convert.ToBase64String(signature);
+            }
+
+            throw new InvalidOperationException("Certificate does not have a supported private key.");
+        }
+
+        public static bool VerifySignature(AgentRequest request, X509Certificate2 certificate)
+        {
+            if (request == null || certificate == null || string.IsNullOrWhiteSpace(request.Signature))
+            {
+                return false;
+            }
+
+            var payload = Encoding.UTF8.GetBytes(BuildPayload(request));
+            byte[] signature;
+            try
+            {
+                signature = Convert.FromBase64String(request.Signature);
+            }
+            catch (FormatException)
+            {
+                return false;
+            }
+            var rsa = certificate.GetRSAPublicKey();
+            if (rsa != null)
+            {
+                return rsa.VerifyData(payload, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            }
+
+            var ecdsa = certificate.GetECDsaPublicKey();
+            if (ecdsa != null)
+            {
+                return ecdsa.VerifyData(payload, signature, HashAlgorithmName.SHA256);
+            }
+
+            return false;
+        }
+
+        private static string BuildPayload(AgentRequest request)
+        {
+            var parameters = request.Parameters ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var parameterString = string.Join("&", parameters
+                .OrderBy(entry => entry.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(entry => $"{entry.Key}={entry.Value}"));
+
+            return string.Join("|", new[]
+            {
+                request.RequestId ?? string.Empty,
+                request.ActionName ?? string.Empty,
+                request.TimestampUnixSeconds.ToString(),
+                request.Nonce ?? string.Empty,
+                parameterString
+            });
+        }
     }
 }

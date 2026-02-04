@@ -91,10 +91,14 @@ public sealed class AgentConfig
     public string[] AnalyzerClientThumbprints { get; set; } = Array.Empty<string>();
     public int ActionTimeoutSeconds { get; set; } = 30;
     public string LogPath { get; set; } = @"C:\ProgramData\DirectoryAnalyzer\agent.log";
- codex/design-production-grade-on-premises-agent-architecture-mn24bx
     public int MaxRequestBytes { get; set; } = 65536;
+    public int RequestClockSkewSeconds { get; set; } = 300;
+    public int ReplayCacheMinutes { get; set; } = 10;
+    public bool RequireSignedRequests { get; set; } = true;
+    public int MaxRequestsPerMinute { get; set; } = 60;
+    public int MaxConcurrentRequests { get; set; } = 10;
+    public bool EnforceRevocationCheck { get; set; } = true;
 
- main
 }
 
 public static class ConfigLoader
@@ -107,6 +111,8 @@ public static class ConfigLoader
     }
 }
 ```
+
+> **MSI configuration**: the installer writes the same settings into `HKLM\SOFTWARE\DirectoryAnalyzer\Agent`. The agent can consume registry overrides for silent installs or when the JSON file is not present.
 
 **Service account**
 * Runs as a **domain service account** or **gMSA** with **read-only AD permissions**.  
@@ -134,7 +140,7 @@ public sealed class AgentHost
 
     public async Task StartAsync(CancellationToken token)
     {
-        _config = ConfigLoader.Load(@"C:\ProgramData\DirectoryAnalyzer\agent.json");
+        _config = ConfigLoader.Load(@"C:\ProgramData\DirectoryAnalyzer\agentsettings.json");
         _registry = new ActionRegistry();
 
         _listener.Prefixes.Add(_config.BindPrefix);
@@ -187,6 +193,12 @@ public sealed class AgentHost
     }
 }
 ```
+
+**Request validation hardening (summary)**
+* **mTLS + allow-list**: verify client certificate chain (CRL/OCSP) and compare thumbprints.
+* **Signed requests**: validate a signature over `RequestId`, `ActionName`, `Timestamp`, `Nonce`, and parameters.
+* **Anti-replay**: reject stale timestamps and reused nonces.
+* **Rate limiting**: enforce per-client request caps and concurrent request limits.
 
 **Certificate binding (Schannel)**
 * Bind using `netsh http add sslcert ...` (see Section 4).  
@@ -442,11 +454,11 @@ public async Task<AgentResponse> ExecuteAsync(AgentRequest request, AgentConfig 
 * JSON lines (one entry per request) for easy SIEM ingestion.  
 
 **Fields captured**
-* `TimestampUtc`, `RequestId`, `ActionName`, `ClientThumbprint`, `DurationMs`, `Status`, `ErrorCode`.  
+* `TimestampUtc`, `RequestId` (correlation ID), `ActionName`, `ClientThumbprint`, `ClientSubject`, `DurationMs`, `Status`, `ErrorCode`.  
 
 **Example log entry**
 ```json
-{"TimestampUtc":"2024-10-04T10:45:31Z","RequestId":"0f8fad5b-d9cb-469f-a165-70867728950e","ActionName":"GetUsers","ClientThumbprint":"A1B2C3...","DurationMs":821,"Status":"Success","ErrorCode":null}
+{"TimestampUtc":"2024-10-04T10:45:31Z","RequestId":"0f8fad5b-d9cb-469f-a165-70867728950e","ActionName":"GetUsers","ClientThumbprint":"A1B2C3...","ClientSubject":"CN=DirectoryAnalyzerClient","DurationMs":821,"Status":"Success","ErrorCode":null}
 ```
 
 **Log storage**
@@ -483,6 +495,11 @@ public sealed class AgentClient
 
     public async Task<AgentResponse> ExecuteAsync(Uri endpoint, AgentRequest request)
     {
+        // Populate anti-replay + signing fields before sending.
+        request.TimestampUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        request.Nonce = Guid.NewGuid().ToString("N");
+        request.Signature = AgentRequestSigner.Sign(request, _clientCert);
+
         var json = JsonSerializer.Serialize(request);
         using var content = new StringContent(json, Encoding.UTF8, "application/json");
         using var response = await _client.PostAsync(endpoint, content);
@@ -540,11 +557,7 @@ public sealed class AgentClient
 1. **Install agent binaries** to `C:\Program Files\DirectoryAnalyzer\Agent`.  
 2. **Create service account or gMSA** with read-only AD permissions.  
 3. **Install agent certificate** (LocalMachine\My) and bind HTTPS port.  
- codex/design-production-grade-on-premises-agent-architecture-mn24bx
 4. **Configure agent JSON** at `C:\ProgramData\DirectoryAnalyzer\agentsettings.json`.  
-
-4. **Configure agent JSON** at `C:\ProgramData\DirectoryAnalyzer\agent.json`.  
- main
 5. **Install Windows Service**:
    ```powershell
    sc.exe create DirectoryAnalyzerAgent binPath= "C:\Program Files\DirectoryAnalyzer\Agent\DirectoryAnalyzer.Agent.exe"
@@ -553,7 +566,6 @@ public sealed class AgentClient
    ```
 6. **Open firewall port** for TCP 8443 inbound from Analyzer subnet only.  
 7. **Install Analyzer client certificate** on Analyzer and configure allow-list in Analyzer config.  
- codex/design-production-grade-on-premises-agent-architecture-mn24bx
 8. **Configure analyzer client JSON** at `C:\ProgramData\DirectoryAnalyzer\agentclientsettings.json`.  
 9. **Validate** by sending a `GetUsers` request from Analyzer UI.  
 
@@ -585,6 +597,21 @@ Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\SecurityProvi
 * Deny interactive logon and remote desktop logon.  
 * Grant “Log on as a service.”  
 
+**Certificate revocation (CRL/OCSP)**
+* Agent validates the client certificate chain with online revocation checks.
+* Analyzer enables `CheckCertificateRevocationList` when validating the agent certificate.
+
+**Anti-replay + signing**
+* Requests include `TimestampUnixSeconds` and a random `Nonce`.
+* The Analyzer signs the canonical request payload; the Agent verifies using the client certificate public key.
+
+**Rate limiting**
+* Per-client request caps and concurrency limits prevent abuse.
+
+**Optional FIPS mode guidance**
+* When FIPS is required, enable Windows FIPS policy and use only SHA-256/RSA/ECDSA as configured in the certificates.
+* Verify that the issued certificates and cipher suites are FIPS-compliant in your organization’s baseline.
+
 **Firewall hardening**
 ```powershell
 New-NetFirewallRule -DisplayName "DirectoryAnalyzer Agent mTLS" `
@@ -614,6 +641,14 @@ msbuild Installer\\DirectoryAnalyzer.Agent.wixproj /p:Configuration=Release
 msiexec /i Installer\\bin\\Release\\DirectoryAnalyzer.Agent.msi /l*v C:\\Temp\\AgentInstall.log
 ```
 
+**Silent install with basic configuration**
+```powershell
+msiexec /i Installer\\bin\\Release\\DirectoryAnalyzer.Agent.msi /qn \\
+  SERVICEACCOUNT="CONTOSO\\gmsaDirectoryAnalyzer$" SERVICEPASSWORD="" \\
+  CERTTHUMBPRINT="<agent-thumbprint>" ANALYZERCLIENTTHUMBPRINTS="<client-thumbprint>" \\
+  BINDPREFIX="https://+:8443/agent/"
+```
+
 ---
 
 ## 15. WPF Integration (DirectoryAnalyzer UI)
@@ -621,9 +656,6 @@ msiexec /i Installer\\bin\\Release\\DirectoryAnalyzer.Agent.msi /l*v C:\\Temp\\A
 * The WPF app includes an **Agent Inventory** module that calls the agent via mTLS.  
 * The UI reads configuration from `C:\\ProgramData\\DirectoryAnalyzer\\agentclientsettings.json`.  
 * The `GetUsers` action is executed through the agent and results are displayed in the DataGrid.  
-
-8. **Validate** by sending a `GetUsers` request from Analyzer UI.  
- main
 
 ---
 
@@ -639,6 +671,9 @@ public sealed class AgentRequest
     public string RequestId { get; set; } = Guid.NewGuid().ToString();
     public string ActionName { get; set; } = string.Empty;
     public JsonElement? Parameters { get; set; }
+    public long TimestampUnixSeconds { get; set; }
+    public string Nonce { get; set; } = string.Empty;
+    public string Signature { get; set; } = string.Empty;
 }
 
 public sealed class AgentResponse
