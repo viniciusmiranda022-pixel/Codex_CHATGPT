@@ -26,6 +26,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="**\obj\**\*.cs" />
+    <Compile Remove="**\bin\**\*.cs" />
+    <Compile Remove="DirectoryAnalyzer.Configuration.Tests\**\*.cs" />
     <Compile Remove="DirectoryAnalyzer.SmokeTests\**\*.cs" />
     <Compile Remove="AgentContracts\**\*.cs" />
     <Compile Remove="AgentService\**\*.cs" />
@@ -33,9 +36,13 @@
     <Compile Remove="DirectoryAnalyzer.Agent\**\*.cs" />
     <Compile Remove="DirectoryAnalyzer.Agent.Client\**\*.cs" />
     <Compile Remove="DirectoryAnalyzer.Agent.Contracts\**\*.cs" />
+    <EmbeddedResource Remove="DirectoryAnalyzer.Configuration.Tests\**\*" />
     <EmbeddedResource Remove="DirectoryAnalyzer.SmokeTests\**\*" />
+    <None Remove="DirectoryAnalyzer.Configuration.Tests\**\*" />
     <None Remove="DirectoryAnalyzer.SmokeTests\**\*" />
+    <Page Remove="DirectoryAnalyzer.Configuration.Tests\**\*" />
     <Page Remove="DirectoryAnalyzer.SmokeTests\**\*" />
+    <Resource Remove="DirectoryAnalyzer.Configuration.Tests\**\*" />
     <Resource Remove="DirectoryAnalyzer.SmokeTests\**\*" />
   </ItemGroup>
 
