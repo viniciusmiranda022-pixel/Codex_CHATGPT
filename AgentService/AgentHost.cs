@@ -148,7 +148,7 @@ namespace DirectoryAnalyzer.Agent
                 clientSubject = clientCert.Subject;
 
                 var rateResult = _rateLimiter.TryAcquire(clientThumbprint);
-                if (!rateResult.Allowed)
+                if (!rateResult.IsAllowed)
                 {
                     errorCode = "RateLimited";
                     context.Response.StatusCode = (int)(HttpStatusCode)429;
@@ -517,12 +517,12 @@ namespace DirectoryAnalyzer.Agent
 
     internal readonly struct RateLimitResult
     {
-        public bool Allowed { get; }
+        public bool IsAllowed { get; }
         public int RetryAfterSeconds { get; }
 
         private RateLimitResult(bool allowed, int retryAfterSeconds)
         {
-            Allowed = allowed;
+            IsAllowed = allowed;
             RetryAfterSeconds = retryAfterSeconds;
         }
 
