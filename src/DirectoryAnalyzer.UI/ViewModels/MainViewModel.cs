@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using System.Windows.Input;
+using DirectoryAnalyzer.Services;
 using DirectoryAnalyzer.Views;
 
 namespace DirectoryAnalyzer.ViewModels
@@ -10,10 +12,12 @@ namespace DirectoryAnalyzer.ViewModels
     public class MainViewModel : INotifyPropertyChanged
     {
         private readonly Dictionary<string, Func<object>> _viewFactory;
+        private readonly ILogService _logService;
         private object _currentView;
 
         public MainViewModel()
         {
+            _logService = LogService.CreateLogger("Navigation");
             _viewFactory = new Dictionary<string, Func<object>>(StringComparer.OrdinalIgnoreCase)
             {
                 ["Dashboard"] = () => new DashboardView(),
@@ -70,7 +74,19 @@ namespace DirectoryAnalyzer.ViewModels
 
             if (_viewFactory.TryGetValue(moduleName, out var createView))
             {
-                CurrentView = createView();
+                try
+                {
+                    CurrentView = createView();
+                }
+                catch (Exception ex)
+                {
+                    _logService.Error($"Falha ao navegar para '{moduleName}': {ex}");
+                    MessageBox.Show(
+                        "Não foi possível abrir este módulo. Verifique o log para mais detalhes.",
+                        "Erro de navegação",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                }
             }
         }
 
