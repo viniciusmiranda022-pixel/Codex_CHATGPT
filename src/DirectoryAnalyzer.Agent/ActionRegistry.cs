@@ -42,8 +42,7 @@ namespace DirectoryAnalyzer.Agent
                 { "ProxyAddressAnalyzer", (request, config, token) => RunPowerShellModuleAsync("ProxyAddressAnalyzer", request, config, token) },
                 { "TrustsAnalyzer", (request, config, token) => RunPowerShellModuleAsync("TrustsAnalyzer", request, config, token) },
                 { "GpoAnalyzer", (request, config, token) => RunPowerShellModuleAsync("GpoAnalyzer", request, config, token) },
-                { "DnsAnalyzer", (request, config, token) => RunPowerShellModuleAsync("DnsAnalyzer", request, config, token) },
-                { "RunPowerShellScript", RunPowerShellScriptAsync }
+                { "DnsAnalyzer", (request, config, token) => RunPowerShellModuleAsync("DnsAnalyzer", request, config, token) }
             };
         }
 
@@ -314,36 +313,6 @@ namespace DirectoryAnalyzer.Agent
             }
 
             var parameters = request.Parameters ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            var results = _powerShellCollector.Execute(scriptText, parameters, out var errors);
-            stopwatch.Stop();
-
-            if (errors.Count > 0)
-            {
-                return Task.FromResult(AgentResponse.Failed(request.RequestId, "PowerShellError", string.Join(" | ", errors)));
-            }
-
-            return Task.FromResult(AgentResponse.Success(request.RequestId, stopwatch.ElapsedMilliseconds, results));
-        }
-
-        private Task<AgentResponse> RunPowerShellScriptAsync(AgentRequest request, AgentConfig config, CancellationToken token)
-        {
-            if (!request.Parameters.TryGetValue("Script", out var scriptText) || string.IsNullOrWhiteSpace(scriptText))
-            {
-                return Task.FromResult(AgentResponse.Failed(request.RequestId, "InvalidParameters", "Script is required."));
-            }
-
-            var parameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var pair in request.Parameters)
-            {
-                if (string.Equals(pair.Key, "Script", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                parameters[pair.Key] = pair.Value;
-            }
-
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var results = _powerShellCollector.Execute(scriptText, parameters, out var errors);
             stopwatch.Stop();

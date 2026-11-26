@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using DirectoryAnalyzer.Broker.Hubs;
 using DirectoryAnalyzer.Broker.Stores;
@@ -31,13 +34,30 @@ namespace DirectoryAnalyzer.Broker.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateJob([FromBody] JobRequest request)
         {
-            if (request == null)
+            if (request == null || string.IsNullOrWhiteSpace(request.ModuleName))
             {
-                return BadRequest();
+                return BadRequest("Pedido sem módulo.");
+            }
+
+            // Origem e destino ficam separados: cada job vai para exatamente um agente nomeado.
+            // Sem alvo, o registro devolveria todas as conexões (broadcast entre ambientes).
+            var targets = request.TargetAgentIds?
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList() ?? new List<string>();
+            if (targets.Count != 1)
+            {
+                return BadRequest("Informe exatamente um agente alvo (TargetAgentIds).");
+            }
+
+            request.TargetAgentIds = targets;
+            var connections = _agentRegistry.GetConnectionIdsForAgents(targets);
+            if (connections.Count == 0)
+            {
+                return Conflict("O agente alvo não está conectado ao Broker.");
             }
 
             var jobId = _jobStore.CreateJob(request);
-            var connections = _agentRegistry.GetConnectionIdsForAgents(request.TargetAgentIds);
             foreach (var connectionId in connections)
             {
                 await _hubContext.Clients.Client(connectionId).DispatchJob(jobId, request);

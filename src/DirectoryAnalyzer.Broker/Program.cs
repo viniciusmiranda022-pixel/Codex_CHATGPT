@@ -60,3 +60,8 @@ app.MapControllers();
 app.MapHub<AgentHub>("/agent-hub");
 
 app.Run();
+
+// Exposto para testes de integração (WebApplicationFactory).
+public partial class Program
+{
+}

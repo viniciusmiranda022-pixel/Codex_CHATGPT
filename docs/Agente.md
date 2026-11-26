@@ -104,6 +104,27 @@ O agente viabiliza coleta remota em ambientes onde a estação do operador não 
 
 **Provas:** `ActionRegistry`, `AgentContracts.cs`.
 
+### Catálogo e gate do agente conectado ao Broker (issue #48)
+No fluxo Broker → agente (`BrokerAgentWorker`), todo `JobRequest` passa por `ModuleRequestGate`
+(`src/DirectoryAnalyzer.Agent/Modules/`) **antes** de qualquer execução. Somente os módulos do
+`ModuleCatalog` padrão acima são aceitos, cada um com seus parâmetros declarados:
+
+| Módulo | Escopo imposto pelo agente | Parâmetros aceitos |
+| --- | --- | --- |
+| GetUsers | domínio do próprio agente (`AgentConfig.Domain` ou RootDSE local) | `IncludeDisabled` (true/false), `LdapFilter` (≤512, parênteses balanceados, charset restrito) |
+| GetGroups, GetComputers, GetGpos, GetDnsZones | domínio do próprio agente | nenhum |
+
+Recusas voltam à WPF como `ModuleResult` sem itens, com `ErrorInfo.ExceptionType = "AgentGate"` e um dos códigos:
+`ArbitraryScriptRejected` (`RunPowerShellScript` foi removida), `ModuleNotLocal` (módulos PowerShell com
+fan-out remoto, pendentes de decisão), `UnknownModule`, `InvalidModuleName`, `UnknownParameter`,
+`InvalidParameter`, `MissingParameter`, `TargetMismatch` (job sem este agente como alvo) e `UnsupportedContract`.
+
+O Broker exige exatamente um `TargetAgentIds` conectado (400/409), aceita `ProgressUpdate`/`SubmitResult`
+apenas da conexão do agente alvo e marca o job como `Failed` quando o resultado só contém erros.
+Na WPF, o agente alvo é configurado em **Agentes → Agente alvo (AgentId)** (`BrokerClientSettings.TargetAgentId`).
+
+Testes: `dotnet test src/DirectoryAnalyzer.Agent.Tests` (net8.0, dados sintéticos, Broker em memória).
+
 ## Configuração do agente
 ### Arquivo `agentsettings.json`
 * Local padrão: `%ProgramData%\DirectoryAnalyzerAgent\agentsettings.json`.

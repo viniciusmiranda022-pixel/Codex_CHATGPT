@@ -9,6 +9,7 @@ namespace DirectoryAnalyzer.Broker.Stores
         void Unregister(string connectionId);
         IReadOnlyCollection<AgentDescriptor> GetAgents();
         bool TryGetAgent(string agentId, out AgentDescriptor agentInfo);
+        bool TryGetAgentByConnection(string connectionId, out AgentDescriptor agentInfo);
         IReadOnlyCollection<string> GetConnectionIdsForAgents(IReadOnlyCollection<string> agentIds);
         IReadOnlyCollection<string> GetAllConnectionIds();
     }

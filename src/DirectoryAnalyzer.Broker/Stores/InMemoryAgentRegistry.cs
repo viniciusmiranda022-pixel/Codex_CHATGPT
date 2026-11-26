@@ -30,6 +30,12 @@ namespace DirectoryAnalyzer.Broker.Stores
             return agentInfo != null;
         }
 
+        public bool TryGetAgentByConnection(string connectionId, out AgentDescriptor agentInfo)
+        {
+            agentInfo = null;
+            return !string.IsNullOrEmpty(connectionId) && _agents.TryGetValue(connectionId, out agentInfo) && agentInfo != null;
+        }
+
         public IReadOnlyCollection<string> GetConnectionIdsForAgents(IReadOnlyCollection<string> agentIds)
         {
             if (agentIds == null || agentIds.Count == 0)

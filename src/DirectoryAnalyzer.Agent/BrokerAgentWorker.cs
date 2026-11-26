@@ -5,6 +5,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 using DirectoryAnalyzer.Agent.Contracts;
+using DirectoryAnalyzer.Agent.Modules;
 using DirectoryAnalyzer.Contracts;
 using Microsoft.AspNetCore.SignalR.Client;
 
@@ -15,7 +16,7 @@ namespace DirectoryAnalyzer.Agent
         private readonly AgentConfig _config;
         private readonly AgentLogger _logger;
         private HubConnection _connection;
-        private ActionRegistry _registry;
+        private AgentJobProcessor _processor;
 
         public BrokerAgentWorker(AgentConfig config)
         {
@@ -25,7 +26,11 @@ namespace DirectoryAnalyzer.Agent
 
         public async Task StartAsync(CancellationToken token)
         {
-            _registry = new ActionRegistry();
+            var identity = new AgentIdentity(ResolveAgentId(), Environment.MachineName, _config.Domain);
+            _processor = new AgentJobProcessor(
+                ModuleCatalog.CreateDefault(),
+                new ActionRegistryModuleExecutor(new ActionRegistry(), _config),
+                identity);
             _connection = BuildConnection();
             _connection.On<string, JobRequest>("DispatchJob", async (jobId, request) =>
             {
@@ -79,161 +84,150 @@ namespace DirectoryAnalyzer.Agent
         {
             return new AgentDescriptor
             {
-                AgentId = string.IsNullOrWhiteSpace(_config.AgentId) ? Environment.MachineName : _config.AgentId,
+                AgentId = ResolveAgentId(),
                 Host = Environment.MachineName,
                 Version = typeof(BrokerAgentWorker).Assembly.GetName().Version?.ToString(),
-                Capabilities = _config.Capabilities?.ToList() ?? new List<string>()
+                // Anuncia o catálogo efetivamente instalado, não uma lista configurável.
+                Capabilities = ModuleCatalog.CreateDefault().ModuleNames.ToList()
             };
         }
 
         private async Task HandleJobAsync(string jobId, JobRequest request, CancellationToken token)
         {
-            var correlationId = string.IsNullOrWhiteSpace(request.CorrelationId) ? jobId : request.CorrelationId;
-            await _connection.InvokeAsync("ProgressUpdate", jobId, 5, "Iniciado", token).ConfigureAwait(false);
-
-            var agentRequest = new AgentRequest
-            {
-                RequestId = jobId,
-                ActionName = request.ModuleName,
-                Parameters = request.Parameters ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-                TimestampUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                Nonce = Guid.NewGuid().ToString("N"),
-                CorrelationId = correlationId
-            };
-
-            var response = await _registry.ExecuteAsync(agentRequest, _config, token).ConfigureAwait(false);
-            var result = MapResponse(request, response, correlationId);
+            // O gate do agente decide antes de qualquer execução; recusas voltam como ModuleResult com ErrorInfo.
+            var result = await _processor.ProcessAsync(
+                jobId,
+                request,
+                (percent, message) => _connection.InvokeAsync("ProgressUpdate", jobId, percent, message, token),
+                token).ConfigureAwait(false);
 
             await _connection.InvokeAsync("SubmitResult", jobId, result, token).ConfigureAwait(false);
         }
 
-        private ModuleResult MapResponse(JobRequest request, AgentResponse response, string correlationId)
+        private string ResolveAgentId()
         {
-            var moduleName = request.ModuleName;
-            if (request.Parameters != null && request.Parameters.TryGetValue("ModuleName", out var moduleOverride)
-                && !string.IsNullOrWhiteSpace(moduleOverride))
-            {
-                moduleName = moduleOverride;
-            }
-
-            var result = new ModuleResult
-            {
-                CorrelationId = correlationId,
-                ModuleName = moduleName,
-                AgentId = string.IsNullOrWhiteSpace(_config.AgentId) ? Environment.MachineName : _config.AgentId,
-                Host = Environment.MachineName,
-                Domain = _config.Domain,
-                StartedAtUtc = DateTime.UtcNow,
-                CompletedAtUtc = DateTime.UtcNow
-            };
-
-            if (response.Status == AgentStatus.Success)
-            {
-                foreach (var item in ConvertPayloadToItems(response.Payload))
-                {
-                    result.Items.Add(item);
-                }
-
-                result.Summary = $"Itens: {result.Items.Count}";
-            }
-            else
-            {
-                result.Errors.Add(new ErrorInfo
-                {
-                    Code = response.Error?.Code,
-                    Message = response.Error?.Message,
-                    Details = response.Error?.Details,
-                    ExceptionType = "AgentResponse"
-                });
-            }
-
-            return result;
+            return string.IsNullOrWhiteSpace(_config.AgentId) ? Environment.MachineName : _config.AgentId;
         }
 
-        private IEnumerable<ResultItem> ConvertPayloadToItems(object payload)
+        private sealed class ActionRegistryModuleExecutor : IModuleExecutor
         {
-            if (payload == null)
+            private readonly ActionRegistry _registry;
+            private readonly AgentConfig _config;
+
+            public ActionRegistryModuleExecutor(ActionRegistry registry, AgentConfig config)
             {
-                return Enumerable.Empty<ResultItem>();
+                _registry = registry;
+                _config = config;
             }
 
-            if (payload is System.Collections.IDictionary dictionary)
+            public async Task<ModuleExecutionOutcome> ExecuteAsync(ModuleDefinition module, IReadOnlyDictionary<string, string> parameters, CancellationToken token)
             {
-                return new[] { BuildItemFromDictionary(dictionary) };
-            }
-
-            if (payload is System.Collections.IEnumerable enumerable && !(payload is string))
-            {
-                return BuildItemsFromEnumerable(enumerable);
-            }
-
-            var collectionProperty = payload.GetType().GetProperties()
-                .FirstOrDefault(prop => prop.PropertyType != typeof(string)
-                    && typeof(System.Collections.IEnumerable).IsAssignableFrom(prop.PropertyType));
-
-            if (collectionProperty != null)
-            {
-                var collection = collectionProperty.GetValue(payload) as System.Collections.IEnumerable;
-                if (collection != null)
+                var agentRequest = new AgentRequest
                 {
-                    return BuildItemsFromEnumerable(collection);
-                }
-            }
+                    RequestId = Guid.NewGuid().ToString("N"),
+                    ActionName = module.Name,
+                    Parameters = parameters.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase),
+                    TimestampUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                    Nonce = Guid.NewGuid().ToString("N")
+                };
 
-            return new[] { BuildItemFromObject(payload) };
-        }
-
-        private IEnumerable<ResultItem> BuildItemsFromEnumerable(System.Collections.IEnumerable items)
-        {
-            var list = new List<ResultItem>();
-            foreach (var item in items)
-            {
-                if (item == null)
+                var response = await _registry.ExecuteAsync(agentRequest, _config, token).ConfigureAwait(false);
+                if (response.Status != AgentStatus.Success)
                 {
-                    continue;
+                    return ModuleExecutionOutcome.Failure(response.Error?.Code, response.Error?.Message, response.Error?.Details);
                 }
 
-                if (item is System.Collections.IDictionary dictionary)
-                {
-                    list.Add(BuildItemFromDictionary(dictionary));
-                }
-                else
-                {
-                    list.Add(BuildItemFromObject(item));
-                }
+                var rows = ConvertPayloadToItems(response.Payload)
+                    .Select(item => (IReadOnlyDictionary<string, string>)item.Columns)
+                    .ToList();
+                return ModuleExecutionOutcome.Success(rows);
             }
 
-            return list;
-        }
-
-        private ResultItem BuildItemFromObject(object item)
-        {
-            var resultItem = new ResultItem { Severity = ResultSeverity.Info };
-            foreach (var prop in item.GetType().GetProperties())
+            private static IEnumerable<ResultItem> ConvertPayloadToItems(object payload)
             {
-                if (!prop.CanRead)
+                if (payload == null)
                 {
-                    continue;
+                    return Enumerable.Empty<ResultItem>();
                 }
 
-                var value = prop.GetValue(item);
-                resultItem.Columns[prop.Name] = value == null ? string.Empty : Convert.ToString(value);
+                if (payload is System.Collections.IDictionary dictionary)
+                {
+                    return new[] { BuildItemFromDictionary(dictionary) };
+                }
+
+                if (payload is System.Collections.IEnumerable enumerable && !(payload is string))
+                {
+                    return BuildItemsFromEnumerable(enumerable);
+                }
+
+                var collectionProperty = payload.GetType().GetProperties()
+                    .FirstOrDefault(prop => prop.PropertyType != typeof(string)
+                        && typeof(System.Collections.IEnumerable).IsAssignableFrom(prop.PropertyType));
+
+                if (collectionProperty != null)
+                {
+                    var collection = collectionProperty.GetValue(payload) as System.Collections.IEnumerable;
+                    if (collection != null)
+                    {
+                        return BuildItemsFromEnumerable(collection);
+                    }
+                }
+
+                return new[] { BuildItemFromObject(payload) };
             }
 
-            return resultItem;
-        }
-
-        private ResultItem BuildItemFromDictionary(System.Collections.IDictionary dictionary)
-        {
-            var resultItem = new ResultItem { Severity = ResultSeverity.Info };
-            foreach (var key in dictionary.Keys)
+            private static IEnumerable<ResultItem> BuildItemsFromEnumerable(System.Collections.IEnumerable items)
             {
-                var keyText = Convert.ToString(key) ?? string.Empty;
-                var value = dictionary[key];
-                resultItem.Columns[keyText] = value == null ? string.Empty : Convert.ToString(value);
+                var list = new List<ResultItem>();
+                foreach (var item in items)
+                {
+                    if (item == null)
+                    {
+                        continue;
+                    }
+
+                    if (item is System.Collections.IDictionary dictionary)
+                    {
+                        list.Add(BuildItemFromDictionary(dictionary));
+                    }
+                    else
+                    {
+                        list.Add(BuildItemFromObject(item));
+                    }
+                }
+
+                return list;
             }
 
-            return resultItem;
+            private static ResultItem BuildItemFromObject(object item)
+            {
+                var resultItem = new ResultItem { Severity = ResultSeverity.Info };
+                foreach (var prop in item.GetType().GetProperties())
+                {
+                    if (!prop.CanRead)
+                    {
+                        continue;
+                    }
+
+                    var value = prop.GetValue(item);
+                    resultItem.Columns[prop.Name] = value == null ? string.Empty : Convert.ToString(value);
+                }
+
+                return resultItem;
+            }
+
+            private static ResultItem BuildItemFromDictionary(System.Collections.IDictionary dictionary)
+            {
+                var resultItem = new ResultItem { Severity = ResultSeverity.Info };
+                foreach (var key in dictionary.Keys)
+                {
+                    var keyText = Convert.ToString(key) ?? string.Empty;
+                    var value = dictionary[key];
+                    resultItem.Columns[keyText] = value == null ? string.Empty : Convert.ToString(value);
+                }
+
+                return resultItem;
+            }
         }
     }
 }

@@ -16,6 +16,7 @@ namespace DirectoryAnalyzer.ViewModels
         private string _clientCertThumbprint;
         private int _requestTimeoutSeconds;
         private int _pollIntervalSeconds;
+        private string _targetAgentId;
 
         public AgentsViewModel()
         {
@@ -59,12 +60,19 @@ namespace DirectoryAnalyzer.ViewModels
             set => SetProperty(ref _pollIntervalSeconds, value);
         }
 
+        public string TargetAgentId
+        {
+            get => _targetAgentId;
+            set => SetProperty(ref _targetAgentId, value);
+        }
+
         private void LoadSettings()
         {
             BrokerBaseUrl = _settings.BrokerBaseUrl;
             ClientCertThumbprint = _settings.ClientCertThumbprint;
             RequestTimeoutSeconds = _settings.RequestTimeoutSeconds;
             PollIntervalSeconds = _settings.PollIntervalSeconds;
+            TargetAgentId = _settings.TargetAgentId;
         }
 
         private void SaveSettings()
@@ -73,6 +81,7 @@ namespace DirectoryAnalyzer.ViewModels
             _settings.ClientCertThumbprint = ClientCertThumbprint;
             _settings.RequestTimeoutSeconds = RequestTimeoutSeconds;
             _settings.PollIntervalSeconds = PollIntervalSeconds;
+            _settings.TargetAgentId = TargetAgentId?.Trim() ?? string.Empty;
 
             BrokerClientSettingsStore.Save(_settingsPath, _settings);
             SetStatus("Configuração do broker salva com sucesso.", "Pronto");

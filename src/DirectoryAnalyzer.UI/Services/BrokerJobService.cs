@@ -20,13 +20,33 @@ namespace DirectoryAnalyzer.Services
             WriteIndented = false
         };
 
+        private readonly Func<HttpMessageHandler> _handlerFactory;
+
         public BrokerJobService(BrokerClientSettings settings)
+            : this(settings, null)
+        {
+        }
+
+        /// <summary>Permite injetar o transporte HTTP (testes de integração com Broker em memória).</summary>
+        public BrokerJobService(BrokerClientSettings settings, Func<HttpMessageHandler> handlerFactory)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+            _handlerFactory = handlerFactory;
         }
 
         public async Task<ModuleResult> RunJobAsync(JobRequest request, CancellationToken token)
         {
+            if (request == null)
+            {
+                throw new ArgumentNullException(nameof(request));
+            }
+
+            if ((request.TargetAgentIds == null || request.TargetAgentIds.Count == 0)
+                && !string.IsNullOrWhiteSpace(_settings.TargetAgentId))
+            {
+                request.TargetAgentIds = new List<string> { _settings.TargetAgentId.Trim() };
+            }
+
             using var client = CreateClient();
             var jobStatus = await CreateJobAsync(client, request, token).ConfigureAwait(false);
             if (jobStatus == null)
@@ -139,6 +159,15 @@ namespace DirectoryAnalyzer.Services
 
         private HttpClient CreateClient()
         {
+            if (_handlerFactory != null)
+            {
+                return new HttpClient(_handlerFactory(), disposeHandler: true)
+                {
+                    BaseAddress = new Uri(_settings.BrokerBaseUrl),
+                    Timeout = TimeSpan.FromSeconds(Math.Max(1, _settings.RequestTimeoutSeconds))
+                };
+            }
+
             var handler = new HttpClientHandler
             {
                 SslProtocols = SslProtocols.Tls12

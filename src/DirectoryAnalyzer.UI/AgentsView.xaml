@@ -40,6 +40,8 @@
                         <TextBox Text="{Binding RequestTimeoutSeconds}" Width="80" Margin="0,0,10,0"/>
                         <TextBox Text="{Binding PollIntervalSeconds}" Width="80"/>
                     </StackPanel>
+                    <TextBlock Text="Agente alvo (AgentId)" Style="{StaticResource SectionHeaderTextStyle}" Margin="0,12,0,0"/>
+                    <TextBox Text="{Binding TargetAgentId}" Margin="0,8,0,0"/>
                 </StackPanel>
             </Grid>
         </Border>

@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Testes multiplataforma (net8.0) do gate do agente e do fluxo WPF -> Broker -> agente.
+    Os arquivos do agente (net48) e do serviço da WPF são vinculados por <Compile Link>, pois
+    dependem apenas de DirectoryAnalyzer.Contracts e da BCL. Dados exclusivamente sintéticos.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\DirectoryAnalyzer.Agent\Modules\*.cs" Link="Linked\Agent\%(Filename)%(Extension)" />
+    <Compile Include="..\DirectoryAnalyzer.UI\Services\BrokerJobService.cs" Link="Linked\UI\BrokerJobService.cs" />
+    <Compile Include="..\DirectoryAnalyzer.UI\Services\BrokerClientSettings.cs" Link="Linked\UI\BrokerClientSettings.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DirectoryAnalyzer.Contracts\DirectoryAnalyzer.Contracts.csproj" />
+    <ProjectReference Include="..\DirectoryAnalyzer.Broker\DirectoryAnalyzer.Broker.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
+    <PackageReference Include="MSTest.TestAdapter" Version="3.2.2" />
+    <PackageReference Include="MSTest.TestFramework" Version="3.2.2" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.11" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.11" />
+  </ItemGroup>
+</Project>

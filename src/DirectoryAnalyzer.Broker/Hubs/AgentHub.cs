@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using DirectoryAnalyzer.Broker.Stores;
 using DirectoryAnalyzer.Contracts;
@@ -34,7 +35,7 @@ namespace DirectoryAnalyzer.Broker.Hubs
         public Task ProgressUpdate(string jobId, int progressPercent, string message)
         {
             var status = _jobStore.GetStatus(jobId);
-            if (status == null)
+            if (status == null || !IsCallerTargetOf(jobId))
             {
                 return Task.CompletedTask;
             }
@@ -49,19 +50,39 @@ namespace DirectoryAnalyzer.Broker.Hubs
 
         public Task SubmitResult(string jobId, ModuleResult result)
         {
+            // Só o agente designado no job pode entregar o resultado; os demais são ignorados.
+            if (result == null || _jobStore.GetStatus(jobId) == null || !IsCallerTargetOf(jobId))
+            {
+                return Task.CompletedTask;
+            }
+
+            _agentRegistry.TryGetAgentByConnection(Context.ConnectionId, out var caller);
+            result.AgentId = caller.AgentId;
             _resultStore.StoreResult(jobId, result);
             var status = _jobStore.GetStatus(jobId);
             if (status != null)
             {
-                status.State = JobState.Completed;
+                var failed = (result.Items == null || result.Items.Count == 0) && result.Errors != null && result.Errors.Count > 0;
+                status.State = failed ? JobState.Failed : JobState.Completed;
                 status.ProgressPercent = 100;
-                status.Message = "Concluído";
+                status.Message = failed ? $"Falha: {result.Errors[0].Code}" : "Concluído";
                 status.CompletedAtUtc = DateTime.UtcNow;
                 status.UpdatedAtUtc = DateTime.UtcNow;
                 _jobStore.TryUpdateStatus(jobId, status);
             }
 
             return Task.CompletedTask;
+        }
+
+        private bool IsCallerTargetOf(string jobId)
+        {
+            var request = _jobStore.GetRequest(jobId);
+            if (request?.TargetAgentIds == null || !_agentRegistry.TryGetAgentByConnection(Context.ConnectionId, out var caller))
+            {
+                return false;
+            }
+
+            return request.TargetAgentIds.Any(id => string.Equals(id, caller.AgentId, StringComparison.OrdinalIgnoreCase));
         }
     }
 }
