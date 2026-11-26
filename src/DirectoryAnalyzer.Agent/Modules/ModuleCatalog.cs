@@ -15,10 +15,13 @@ namespace DirectoryAnalyzer.Agent.Modules
         LocalHost = 1
     }
 
+    /// <summary>
+    /// Tipos de parâmetro aceitos no contrato remoto. Não há tipo de texto livre nem filtro LDAP:
+    /// a expressão de consulta é fixa no agente (decisão de revisão da #49).
+    /// </summary>
     public enum ModuleParameterKind
     {
-        Boolean = 0,
-        LdapFilter = 1
+        Boolean = 0
     }
 
     public sealed class ModuleParameterSpec
@@ -122,14 +125,16 @@ namespace DirectoryAnalyzer.Agent.Modules
             return !string.IsNullOrEmpty(moduleName) && _modules.TryGetValue(moduleName, out module);
         }
 
-        /// <summary>Catálogo padrão: somente leitura LDAP do domínio do próprio agente.</summary>
+        /// <summary>
+        /// Catálogo padrão: somente leitura LDAP do domínio do próprio agente. As bases consultadas por
+        /// módulo estão em <see cref="DirectorySearchBases"/> (GetDnsZones: apenas DomainDnsZones).
+        /// </summary>
         public static ModuleCatalog CreateDefault()
         {
             return new ModuleCatalog(new[]
             {
                 new ModuleDefinition("GetUsers", ModuleScope.AgentDomainDirectory,
-                    new ModuleParameterSpec("IncludeDisabled", ModuleParameterKind.Boolean),
-                    new ModuleParameterSpec("LdapFilter", ModuleParameterKind.LdapFilter)),
+                    new ModuleParameterSpec("IncludeDisabled", ModuleParameterKind.Boolean)),
                 new ModuleDefinition("GetGroups", ModuleScope.AgentDomainDirectory),
                 new ModuleDefinition("GetComputers", ModuleScope.AgentDomainDirectory),
                 new ModuleDefinition("GetGpos", ModuleScope.AgentDomainDirectory),

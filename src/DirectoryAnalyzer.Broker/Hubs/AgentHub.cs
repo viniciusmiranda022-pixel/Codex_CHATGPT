@@ -20,8 +20,30 @@ namespace DirectoryAnalyzer.Broker.Hubs
             _agentRegistry = agentRegistry;
         }
 
+        public const string AgentDisconnectedMessage = "AgentDisconnected: a conexão do agente caiu antes da entrega do resultado.";
+
         public override Task OnDisconnectedAsync(Exception exception)
         {
+            // Jobs vinculados a esta conexão não podem mais ser concluídos por outra; encerra como falha
+            // para que a WPF mostre "agente indisponível" em vez de esperar indefinidamente.
+            foreach (var jobId in _jobStore.ListJobIds())
+            {
+                if (!string.Equals(_jobStore.GetAssignedConnectionId(jobId), Context.ConnectionId, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var status = _jobStore.GetStatus(jobId);
+                if (status != null && status.State != JobState.Completed && status.State != JobState.Failed)
+                {
+                    status.State = JobState.Failed;
+                    status.Message = AgentDisconnectedMessage;
+                    status.UpdatedAtUtc = DateTime.UtcNow;
+                    status.CompletedAtUtc = DateTime.UtcNow;
+                    _jobStore.TryUpdateStatus(jobId, status);
+                }
+            }
+
             _agentRegistry.Unregister(Context.ConnectionId);
             return base.OnDisconnectedAsync(exception);
         }
@@ -35,7 +57,7 @@ namespace DirectoryAnalyzer.Broker.Hubs
         public Task ProgressUpdate(string jobId, int progressPercent, string message)
         {
             var status = _jobStore.GetStatus(jobId);
-            if (status == null || !IsCallerTargetOf(jobId))
+            if (status == null || !IsCallerAssignedTo(jobId))
             {
                 return Task.CompletedTask;
             }
@@ -50,8 +72,9 @@ namespace DirectoryAnalyzer.Broker.Hubs
 
         public Task SubmitResult(string jobId, ModuleResult result)
         {
-            // Só o agente designado no job pode entregar o resultado; os demais são ignorados.
-            if (result == null || _jobStore.GetStatus(jobId) == null || !IsCallerTargetOf(jobId))
+            // Só a conexão designada no despacho pode entregar o resultado; as demais são ignoradas,
+            // inclusive outra conexão que declare o mesmo AgentId depois do despacho.
+            if (result == null || _jobStore.GetStatus(jobId) == null || !IsCallerAssignedTo(jobId))
             {
                 return Task.CompletedTask;
             }
@@ -74,15 +97,22 @@ namespace DirectoryAnalyzer.Broker.Hubs
             return Task.CompletedTask;
         }
 
-        private bool IsCallerTargetOf(string jobId)
+        private bool IsCallerAssignedTo(string jobId)
         {
-            var request = _jobStore.GetRequest(jobId);
-            if (request?.TargetAgentIds == null || !_agentRegistry.TryGetAgentByConnection(Context.ConnectionId, out var caller))
+            var assigned = _jobStore.GetAssignedConnectionId(jobId);
+            if (string.IsNullOrEmpty(assigned) || !string.Equals(assigned, Context.ConnectionId, StringComparison.Ordinal))
             {
                 return false;
             }
 
-            return request.TargetAgentIds.Any(id => string.Equals(id, caller.AgentId, StringComparison.OrdinalIgnoreCase));
+            var request = _jobStore.GetRequest(jobId);
+            if (request?.TargetAgentIds == null || request.TargetAgentIds.Count != 1
+                || !_agentRegistry.TryGetAgentByConnection(Context.ConnectionId, out var caller))
+            {
+                return false;
+            }
+
+            return string.Equals(request.TargetAgentIds[0], caller.AgentId, StringComparison.OrdinalIgnoreCase);
         }
     }
 }

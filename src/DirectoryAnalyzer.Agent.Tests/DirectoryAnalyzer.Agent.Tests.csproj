@@ -15,6 +15,8 @@
     <Compile Include="..\DirectoryAnalyzer.Agent\Modules\*.cs" Link="Linked\Agent\%(Filename)%(Extension)" />
     <Compile Include="..\DirectoryAnalyzer.UI\Services\BrokerJobService.cs" Link="Linked\UI\BrokerJobService.cs" />
     <Compile Include="..\DirectoryAnalyzer.UI\Services\BrokerClientSettings.cs" Link="Linked\UI\BrokerClientSettings.cs" />
+    <Compile Include="..\DirectoryAnalyzer.UI\Services\CollectionOutcome.cs" Link="Linked\UI\CollectionOutcome.cs" />
+    <Compile Include="..\DirectoryAnalyzer.UI\Services\ModuleAvailability.cs" Link="Linked\UI\ModuleAvailability.cs" />
   </ItemGroup>
 
   <ItemGroup>

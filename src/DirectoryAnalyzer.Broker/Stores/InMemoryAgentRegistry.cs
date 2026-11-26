@@ -40,7 +40,8 @@ namespace DirectoryAnalyzer.Broker.Stores
         {
             if (agentIds == null || agentIds.Count == 0)
             {
-                return GetAllConnectionIds();
+                // Sem alvo não há destinatário: o broadcast entre ambientes foi removido.
+                return new List<string>();
             }
 
             var connections = _agents
@@ -49,6 +50,19 @@ namespace DirectoryAnalyzer.Broker.Stores
                 .ToList();
 
             return connections;
+        }
+
+        public IReadOnlyCollection<string> GetConnectionIdsForAgent(string agentId)
+        {
+            if (string.IsNullOrWhiteSpace(agentId))
+            {
+                return new List<string>();
+            }
+
+            return _agents
+                .Where(pair => pair.Value != null && string.Equals(pair.Value.AgentId, agentId, System.StringComparison.OrdinalIgnoreCase))
+                .Select(pair => pair.Key)
+                .ToList();
         }
 
         public IReadOnlyCollection<string> GetAllConnectionIds()

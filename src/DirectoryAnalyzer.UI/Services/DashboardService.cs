@@ -119,6 +119,43 @@ namespace DirectoryAnalyzer.Services
             LastCompletedEntry = entry;
         }
 
+        /// <summary>
+        /// Registra o desfecho classificado de uma coleta. "Concluído (0 itens)", "Recusado",
+        /// "Agente indisponível" e "Indisponível nesta versão" ficam distintos no painel.
+        /// </summary>
+        public void RecordModuleOutcome(string moduleName, CollectionOutcome outcome)
+        {
+            if (outcome == null)
+            {
+                throw new ArgumentNullException(nameof(outcome));
+            }
+
+            if (string.IsNullOrWhiteSpace(moduleName))
+            {
+                moduleName = "Módulo";
+            }
+
+            DateTime completedAt = DateTime.Now;
+            TimeSpan? duration = null;
+            if (_startTimes.TryRemove(moduleName, out DateTime startTime))
+            {
+                duration = completedAt - startTime;
+            }
+
+            var entry = new DashboardActivityEntry
+            {
+                Timestamp = completedAt,
+                Module = moduleName,
+                Status = outcome.DashboardStatus,
+                DurationSeconds = duration?.TotalSeconds,
+                ItemCount = outcome.IsSuccess ? outcome.ItemCount : (int?)null,
+                ErrorCount = outcome.Kind == CollectionOutcomeKind.Canceled ? (int?)null : outcome.ErrorCount
+            };
+
+            AddEntry(entry);
+            LastCompletedEntry = entry;
+        }
+
         private void AddEntry(DashboardActivityEntry entry)
         {
             lock (_lock)

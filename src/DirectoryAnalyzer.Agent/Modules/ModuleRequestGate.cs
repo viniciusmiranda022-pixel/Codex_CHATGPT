@@ -31,6 +31,7 @@ namespace DirectoryAnalyzer.Agent.Modules
         public const string InvalidRequest = "InvalidRequest";
         public const string UnsupportedContract = "UnsupportedContract";
         public const string TargetMismatch = "TargetMismatch";
+        public const string AmbiguousTarget = "AmbiguousTarget";
         public const string InvalidModuleName = "InvalidModuleName";
         public const string ArbitraryScriptRejected = "ArbitraryScriptRejected";
         public const string ModuleNotLocal = "ModuleNotLocal";
@@ -77,7 +78,6 @@ namespace DirectoryAnalyzer.Agent.Modules
         private const int MaxParameterValueLength = 512;
         private static readonly Regex ModuleNamePattern = new Regex("^[A-Za-z][A-Za-z0-9]{0,63}$", RegexOptions.CultureInvariant);
         private static readonly Regex ParameterNamePattern = new Regex("^[A-Za-z][A-Za-z0-9]{0,63}$", RegexOptions.CultureInvariant);
-        private static readonly Regex LdapFilterCharset = new Regex(@"^[a-zA-Z0-9=\*\(\)\&\|\!\-\._@\s\\:;,\+/]+$", RegexOptions.CultureInvariant);
 
         private readonly ModuleCatalog _catalog;
         private readonly AgentIdentity _identity;
@@ -101,8 +101,16 @@ namespace DirectoryAnalyzer.Agent.Modules
                     $"Versão de contrato não suportada pelo agente (esperado {SupportedContractVersion}).");
             }
 
+            // Um job tem exatamente um destinatário. Uma lista com este agente e outros é recusada,
+            // mesmo que o Broker já faça a mesma checagem.
             var targets = request.TargetAgentIds ?? new List<string>();
-            if (!targets.Any(id => string.Equals(id, _identity.AgentId, StringComparison.OrdinalIgnoreCase)))
+            if (targets.Count > 1)
+            {
+                return GateDecision.Reject(GateErrorCodes.AmbiguousTarget,
+                    "O pedido designa mais de um agente; cada job deve ter um único destinatário.");
+            }
+
+            if (targets.Count == 0 || !string.Equals(targets[0], _identity.AgentId, StringComparison.OrdinalIgnoreCase))
             {
                 return GateDecision.Reject(GateErrorCodes.TargetMismatch,
                     "O pedido não designa este agente como alvo.");
@@ -188,43 +196,10 @@ namespace DirectoryAnalyzer.Agent.Modules
                     value = flag ? "true" : "false";
                     return true;
 
-                case ModuleParameterKind.LdapFilter:
-                    var trimmed = raw.Trim();
-                    if (trimmed.Length == 0
-                        || !trimmed.StartsWith("(", StringComparison.Ordinal)
-                        || !trimmed.EndsWith(")", StringComparison.Ordinal)
-                        || !LdapFilterCharset.IsMatch(trimmed)
-                        || !HasBalancedParentheses(trimmed))
-                    {
-                        error = $"Parâmetro '{spec.Name}' não é um filtro LDAP aceito.";
-                        return false;
-                    }
-
-                    value = trimmed;
-                    return true;
-
                 default:
                     error = $"Tipo do parâmetro '{spec.Name}' não suportado.";
                     return false;
             }
-        }
-
-        private static bool HasBalancedParentheses(string filter)
-        {
-            var depth = 0;
-            foreach (var ch in filter)
-            {
-                if (ch == '(')
-                {
-                    depth++;
-                }
-                else if (ch == ')' && --depth < 0)
-                {
-                    return false;
-                }
-            }
-
-            return depth == 0;
         }
 
         private static string Describe(string key)

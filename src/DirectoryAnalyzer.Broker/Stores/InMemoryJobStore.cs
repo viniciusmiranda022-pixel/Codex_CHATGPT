@@ -9,19 +9,26 @@ namespace DirectoryAnalyzer.Broker.Stores
     {
         private sealed class JobRecord
         {
-            public JobRecord(JobRequest request, JobStatus status)
+            public JobRecord(JobRequest request, JobStatus status, string assignedConnectionId)
             {
                 Request = request;
                 Status = status;
+                AssignedConnectionId = assignedConnectionId;
             }
 
             public JobRequest Request { get; }
+            public string AssignedConnectionId { get; }
             public JobStatus Status { get; set; }
         }
 
         private readonly ConcurrentDictionary<string, JobRecord> _jobs = new ConcurrentDictionary<string, JobRecord>();
 
         public string CreateJob(JobRequest request)
+        {
+            return CreateJob(request, null);
+        }
+
+        public string CreateJob(JobRequest request, string assignedConnectionId)
         {
             var jobId = Guid.NewGuid().ToString("N");
             var status = new JobStatus
@@ -34,7 +41,7 @@ namespace DirectoryAnalyzer.Broker.Stores
                 UpdatedAtUtc = DateTime.UtcNow
             };
 
-            _jobs[jobId] = new JobRecord(request, status);
+            _jobs[jobId] = new JobRecord(request, status, assignedConnectionId);
             return jobId;
         }
 
@@ -52,6 +59,11 @@ namespace DirectoryAnalyzer.Broker.Stores
             }
 
             return false;
+        }
+
+        public string GetAssignedConnectionId(string jobId)
+        {
+            return _jobs.TryGetValue(jobId, out var record) ? record.AssignedConnectionId : null;
         }
 
         public JobRequest GetRequest(string jobId)

@@ -52,6 +52,9 @@ namespace DirectoryAnalyzer.Agent.Tests
 
         public int Calls => Volatile.Read(ref _calls);
         public TaskCompletionSource<bool> Gate { get; set; }
+
+        /// <summary>Simula uma coleta válida que não encontra objetos.</summary>
+        public bool ReturnEmpty { get; set; }
         public IReadOnlyDictionary<string, string> LastParameters { get; private set; }
 
         public async Task<ModuleExecutionOutcome> ExecuteAsync(ModuleDefinition module, IReadOnlyDictionary<string, string> parameters, CancellationToken token)
@@ -63,7 +66,9 @@ namespace DirectoryAnalyzer.Agent.Tests
                 await Gate.Task.ConfigureAwait(false);
             }
 
-            return ModuleExecutionOutcome.Success(SyntheticData.UsersFor(_domain));
+            return ModuleExecutionOutcome.Success(ReturnEmpty
+                ? new List<IReadOnlyDictionary<string, string>>()
+                : SyntheticData.UsersFor(_domain));
         }
     }
 }

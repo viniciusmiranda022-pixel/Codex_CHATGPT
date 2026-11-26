@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.DirectoryServices;
 using System.Security.Principal;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using DirectoryAnalyzer.Agent.Contracts;
+using DirectoryAnalyzer.Agent.Modules;
 using DirectoryAnalyzer.Collectors;
 
 namespace DirectoryAnalyzer.Agent
@@ -14,8 +14,7 @@ namespace DirectoryAnalyzer.Agent
     {
         private static readonly HashSet<string> AllowedUserParameters = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "IncludeDisabled",
-            "LdapFilter"
+            "IncludeDisabled"
         };
 
         private static readonly HashSet<string> NoParametersAllowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -82,23 +81,15 @@ namespace DirectoryAnalyzer.Agent
                 return Task.FromResult(AgentResponse.Failed(request.RequestId, "InvalidParameters", error));
             }
 
-            if (!TryGetLdapFilter(request.Parameters, out var ldapFilter, out error))
-            {
-                return Task.FromResult(AgentResponse.Failed(request.RequestId, "InvalidParameters", error));
-            }
-
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var results = new GetUsersResult();
 
-            var defaultNamingContext = GetDefaultNamingContext(config);
-            using var entry = CreateDirectoryEntry(config, defaultNamingContext);
+            var searchBase = DirectorySearchBases.For("GetUsers", ReadRootDse(config))[0];
+            using var entry = CreateDirectoryEntry(config, searchBase);
             using var searcher = CreateSearcher(entry);
 
+            // O filtro é fixo no agente; o solicitante só escolhe IncludeDisabled.
             var filter = "(&(objectCategory=person)(objectClass=user)";
-            if (!string.IsNullOrWhiteSpace(ldapFilter))
-            {
-                filter += ldapFilter;
-            }
 
             if (!includeDisabled)
             {
@@ -147,8 +138,8 @@ namespace DirectoryAnalyzer.Agent
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var results = new GetGroupsResult();
 
-            var defaultNamingContext = GetDefaultNamingContext(config);
-            using var entry = CreateDirectoryEntry(config, defaultNamingContext);
+            var searchBase = DirectorySearchBases.For("GetGroups", ReadRootDse(config))[0];
+            using var entry = CreateDirectoryEntry(config, searchBase);
             using var searcher = CreateSearcher(entry);
             searcher.Filter = "(objectCategory=group)";
             searcher.PropertiesToLoad.AddRange(new[]
@@ -187,8 +178,8 @@ namespace DirectoryAnalyzer.Agent
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var results = new GetComputersResult();
 
-            var defaultNamingContext = GetDefaultNamingContext(config);
-            using var entry = CreateDirectoryEntry(config, defaultNamingContext);
+            var searchBase = DirectorySearchBases.For("GetComputers", ReadRootDse(config))[0];
+            using var entry = CreateDirectoryEntry(config, searchBase);
             using var searcher = CreateSearcher(entry);
             searcher.Filter = "(objectCategory=computer)";
             searcher.PropertiesToLoad.AddRange(new[]
@@ -227,13 +218,7 @@ namespace DirectoryAnalyzer.Agent
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var results = new GetGposResult();
 
-            var defaultNamingContext = GetDefaultNamingContext(config);
-            if (string.IsNullOrWhiteSpace(defaultNamingContext))
-            {
-                return Task.FromResult(AgentResponse.Failed(request.RequestId, "DirectoryError", "Default naming context not available."));
-            }
-
-            var policiesDn = $"CN=Policies,CN=System,{defaultNamingContext}";
+            var policiesDn = DirectorySearchBases.For("GetGpos", ReadRootDse(config))[0];
             using var entry = CreateDirectoryEntry(config, policiesDn);
             using var searcher = CreateSearcher(entry);
             searcher.Filter = "(objectClass=groupPolicyContainer)";
@@ -271,11 +256,10 @@ namespace DirectoryAnalyzer.Agent
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var results = new GetDnsZonesResult();
 
-            var contexts = GetDnsNamingContexts(config);
-            foreach (var namingContext in contexts)
+            // Somente a partição DNS do domínio do agente (ver DirectorySearchBases).
+            foreach (var baseDn in DirectorySearchBases.For("GetDnsZones", ReadRootDse(config)))
             {
                 token.ThrowIfCancellationRequested();
-                var baseDn = $"CN=MicrosoftDNS,{namingContext}";
                 using var entry = CreateDirectoryEntry(config, baseDn);
                 using var searcher = CreateSearcher(entry);
                 searcher.Filter = "(objectClass=dnsZone)";
@@ -363,72 +347,6 @@ namespace DirectoryAnalyzer.Agent
             return true;
         }
 
-        private static bool TryGetLdapFilter(Dictionary<string, string> parameters, out string filter, out string error)
-        {
-            filter = string.Empty;
-            error = string.Empty;
-            if (parameters == null || !parameters.TryGetValue("LdapFilter", out var raw))
-            {
-                return true;
-            }
-
-            if (string.IsNullOrWhiteSpace(raw))
-            {
-                error = "LdapFilter cannot be empty.";
-                return false;
-            }
-
-            var trimmed = raw.Trim();
-            if (trimmed.Length > 512)
-            {
-                error = "LdapFilter exceeds the maximum length of 512 characters.";
-                return false;
-            }
-
-            if (!trimmed.StartsWith("(", StringComparison.Ordinal) || !trimmed.EndsWith(")", StringComparison.Ordinal))
-            {
-                error = "LdapFilter must start with '(' and end with ')'.";
-                return false;
-            }
-
-            if (!IsLdapFilterSafe(trimmed))
-            {
-                error = "LdapFilter contains invalid characters or unmatched parentheses.";
-                return false;
-            }
-
-            filter = trimmed;
-            return true;
-        }
-
-        private static bool IsLdapFilterSafe(string filter)
-        {
-            var allowed = new Regex(@"^[a-zA-Z0-9=\*\(\)\&\|\!\-\._@\s\\:;,\+/]+$");
-            if (!allowed.IsMatch(filter))
-            {
-                return false;
-            }
-
-            var depth = 0;
-            foreach (var ch in filter)
-            {
-                if (ch == '(')
-                {
-                    depth++;
-                }
-                else if (ch == ')')
-                {
-                    depth--;
-                    if (depth < 0)
-                    {
-                        return false;
-                    }
-                }
-            }
-
-            return depth == 0;
-        }
-
         private static DirectorySearcher CreateSearcher(DirectoryEntry entry)
         {
             return new DirectorySearcher(entry)
@@ -438,45 +356,18 @@ namespace DirectoryAnalyzer.Agent
             };
         }
 
-        private static string GetDefaultNamingContext(AgentConfig config)
+        private static RootDseSnapshot ReadRootDse(AgentConfig config)
         {
             using var rootDse = new DirectoryEntry(string.IsNullOrWhiteSpace(config.Domain)
                 ? "LDAP://RootDSE"
                 : $"LDAP://{config.Domain}/RootDSE");
-            return rootDse.Properties["defaultNamingContext"]?.Value as string ?? string.Empty;
-        }
-
-        private static List<string> GetDnsNamingContexts(AgentConfig config)
-        {
-            var contexts = new List<string>();
-            using var rootDse = new DirectoryEntry(string.IsNullOrWhiteSpace(config.Domain)
-                ? "LDAP://RootDSE"
-                : $"LDAP://{config.Domain}/RootDSE");
-
-            var domainDns = rootDse.Properties["domainDnsZones"]?.Value as string;
-            var forestDns = rootDse.Properties["forestDnsZones"]?.Value as string;
-            var defaultNamingContext = rootDse.Properties["defaultNamingContext"]?.Value as string;
-            var forestNamingContext = rootDse.Properties["forestNamingContext"]?.Value as string;
-
-            if (!string.IsNullOrWhiteSpace(domainDns))
+            return new RootDseSnapshot
             {
-                contexts.Add(domainDns);
-            }
-            else if (!string.IsNullOrWhiteSpace(defaultNamingContext))
-            {
-                contexts.Add($"DC=DomainDnsZones,{defaultNamingContext}");
-            }
-
-            if (!string.IsNullOrWhiteSpace(forestDns))
-            {
-                contexts.Add(forestDns);
-            }
-            else if (!string.IsNullOrWhiteSpace(forestNamingContext))
-            {
-                contexts.Add($"DC=ForestDnsZones,{forestNamingContext}");
-            }
-
-            return contexts;
+                DefaultNamingContext = rootDse.Properties["defaultNamingContext"]?.Value as string,
+                DomainDnsZones = rootDse.Properties["domainDnsZones"]?.Value as string,
+                ForestDnsZones = rootDse.Properties["forestDnsZones"]?.Value as string,
+                RootDomainNamingContext = rootDse.Properties["rootDomainNamingContext"]?.Value as string
+            };
         }
 
         private static DirectoryEntry CreateDirectoryEntry(AgentConfig config, string distinguishedName)

@@ -18,8 +18,7 @@ namespace DirectoryAnalyzer.Agent.Tests
         {
             var request = SyntheticData.UsersRequest(SyntheticData.OriginAgentId, new Dictionary<string, string>
             {
-                ["includedisabled"] = " TRUE ",
-                ["LdapFilter"] = "(department=Financeiro Ficticio)"
+                ["includedisabled"] = " TRUE "
             });
 
             var decision = CreateGate().Evaluate(request);
@@ -28,7 +27,6 @@ namespace DirectoryAnalyzer.Agent.Tests
             Assert.AreEqual("GetUsers", decision.Module.Name);
             Assert.AreEqual(ModuleScope.AgentDomainDirectory, decision.Module.Scope);
             Assert.AreEqual("true", decision.Parameters["IncludeDisabled"]);
-            Assert.AreEqual("(department=Financeiro Ficticio)", decision.Parameters["LdapFilter"]);
         }
 
         [DataTestMethod]
@@ -123,9 +121,6 @@ namespace DirectoryAnalyzer.Agent.Tests
         [DataTestMethod]
         [DataRow("IncludeDisabled", "yes")]
         [DataRow("IncludeDisabled", "1")]
-        [DataRow("LdapFilter", "department=Financeiro")]
-        [DataRow("LdapFilter", "(cn=*))(|(cn=*)")]
-        [DataRow("LdapFilter", "(cn=$(whoami))")]
         public void Rejects_IncompatibleParameterValues(string key, string value)
         {
             var request = SyntheticData.UsersRequest(SyntheticData.OriginAgentId, new Dictionary<string, string> { [key] = value });
@@ -137,7 +132,7 @@ namespace DirectoryAnalyzer.Agent.Tests
         {
             var request = SyntheticData.UsersRequest(SyntheticData.OriginAgentId, new Dictionary<string, string>
             {
-                ["LdapFilter"] = "(" + new string('a', 600) + ")"
+                ["IncludeDisabled"] = new string('t', 600)
             });
             AssertRejected(request, GateErrorCodes.InvalidParameter);
         }
@@ -146,6 +141,36 @@ namespace DirectoryAnalyzer.Agent.Tests
         public void Rejects_JobAddressedToAnotherAgent()
         {
             AssertRejected(SyntheticData.UsersRequest(SyntheticData.DestinationAgentId), GateErrorCodes.TargetMismatch);
+        }
+
+        [DataTestMethod]
+        [DataRow("(department=Financeiro Ficticio)")]
+        [DataRow("(objectClass=*)")]
+        [DataRow("(cn=*))(|(cn=*)")]
+        public void Rejects_LdapFilter_BecauseQueryExpressionIsFixedInAgent(string filter)
+        {
+            // Revisão da #49: o filtro LDAP livre saiu do contrato remoto; só IncludeDisabled é aceito.
+            var request = SyntheticData.UsersRequest(SyntheticData.OriginAgentId, new Dictionary<string, string> { ["LdapFilter"] = filter });
+            AssertRejected(request, GateErrorCodes.UnknownParameter);
+        }
+
+        [TestMethod]
+        public void Rejects_TargetListContainingThisAgentAndAnother()
+        {
+            var request = SyntheticData.UsersRequest(SyntheticData.OriginAgentId);
+            request.TargetAgentIds.Add(SyntheticData.DestinationAgentId);
+            AssertRejected(request, GateErrorCodes.AmbiguousTarget);
+
+            var duplicated = SyntheticData.UsersRequest(SyntheticData.OriginAgentId);
+            duplicated.TargetAgentIds.Add(SyntheticData.OriginAgentId);
+            AssertRejected(duplicated, GateErrorCodes.AmbiguousTarget);
+        }
+
+        [TestMethod]
+        public void Catalog_GetUsersDeclaresOnlyIncludeDisabled()
+        {
+            Assert.IsTrue(ModuleCatalog.CreateDefault().TryGet("GetUsers", out var module));
+            CollectionAssert.AreEquivalent(new[] { "IncludeDisabled" }, new List<string>(module.Parameters.Keys));
         }
 
         [TestMethod]
