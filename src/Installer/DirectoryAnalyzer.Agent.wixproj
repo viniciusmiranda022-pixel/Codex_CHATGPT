@@ -1,25 +1,39 @@
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!--
+    MSI do agente com conexão de saída (src/DirectoryAnalyzer.Agent). Até a versão 1.0.0.0 este projeto
+    empacotava src/AgentService, que abre um listener HTTPS de entrada e não conecta ao Broker. Os dois
+    geram DirectoryAnalyzer.Agent.exe; InstallerPackagingTests confere qual projeto é referenciado.
+  -->
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Release</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
+    <Platform Condition=" '$(Platform)' == '' ">x64</Platform>
     <ProjectGuid>{D26C5E0B-2A2B-4EE2-AD76-25D3A5E9E8A8}</ProjectGuid>
     <OutputName>DirectoryAnalyzer.Agent</OutputName>
     <OutputType>Package</OutputType>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x86' ">
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
     <OutputPath>bin\Release\</OutputPath>
+    <IntermediateOutputPath>obj\Release\</IntermediateOutputPath>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Product.wxs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\AgentService\AgentService.csproj">
-      <Name>AgentService</Name>
-      <Project>{5B3B8A35-DA6A-4C99-9CEB-3D345D79F2C8}</Project>
+    <WixExtension Include="WixUtilExtension">
+      <HintPath>$(WixExtDir)\WixUtilExtension.dll</HintPath>
+      <Name>WixUtilExtension</Name>
+    </WixExtension>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DirectoryAnalyzer.Agent\DirectoryAnalyzer.Agent.csproj">
+      <Name>DirectoryAnalyzer.Agent</Name>
       <Private>True</Private>
       <DoNotHarvest>True</DoNotHarvest>
       <RefProjectOutputGroups>Binaries</RefProjectOutputGroups>
-      <RefTargetDir>AgentService</RefTargetDir>
+      <RefTargetDir>INSTALLFOLDER</RefTargetDir>
+      <!-- O agente é AnyCPU (net48); não propaga Platform=x64 para o projeto SDK. -->
+      <SetPlatform>Platform=AnyCPU</SetPlatform>
+      <SetConfiguration>Configuration=$(Configuration)</SetConfiguration>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(WixTargetsPath)" Condition=" '$(WixTargetsPath)' != '' " />

@@ -1,116 +1,189 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+<!--
+  MSI do agente do Directory Analyzer (issue #48, decisão 2).
+
+  Empacota src/DirectoryAnalyzer.Agent: o serviço abre uma conexão HTTPS de SAÍDA com o Broker
+  (SignalR, BrokerAgentWorker) e executa apenas o catálogo local de módulos de inventário.
+  Não há listener de entrada nem regra de firewall de entrada criada por este pacote.
+
+  O pacote é x64 para que o serviço (AnyCPU, 64 bits) e o MSI usem a mesma visão do registro
+  HKLM\SOFTWARE\DirectoryAnalyzer\Agent. A versão 1.0.0.0 (AgentService, listener de entrada) era x86
+  e gravava em WOW6432Node.
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
   <Product Id="*"
            Name="DirectoryAnalyzer Agent"
            Language="1033"
-           Version="1.0.0.0"
+           Version="1.1.0.0"
            Manufacturer="DirectoryAnalyzer"
            UpgradeCode="{45BFD46A-7F6A-4A34-9B2E-6E053E845237}">
-    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" />
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" Platform="x64" />
     <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
-    <MediaTemplate />
+    <MediaTemplate EmbedCab="yes" />
 
     <Property Id="ARPNOREPAIR" Value="yes" />
     <Property Id="ARPNOMODIFY" Value="yes" />
 
-    <Property Id="SERVICEACCOUNT" Value="NT AUTHORITY\LocalService" />
+    <!--
+      NetworkService autentica no AD como a conta de computador, o que basta para a leitura LDAP do
+      catálogo habilitado (GetUsers, GetGroups, GetComputers, GetGpos, GetDnsZones). LocalService,
+      usada pela versão anterior, se apresenta como anônimo na rede e não consegue ler o diretório.
+      Uma conta diferente (ex.: gMSA) exige conceder manualmente leitura/escrita em ProgramData.
+    -->
+    <Property Id="SERVICEACCOUNT" Value="NT AUTHORITY\NetworkService" />
     <Property Id="SERVICEPASSWORD" Value="" Hidden="yes" />
-    <Property Id="LISTENPORT" Value="8443" />
-    <Property Id="BINDPREFIX" Value="https://+:8443/agent/" />
-    <Property Id="CERTTHUMBPRINT" Value="" />
-    <Property Id="ALLOWEDCLIENTCERTTHUMBPRINTS" Value="" />
-    <Property Id="TRUSTEDCATHUMBPRINTS" Value="" />
-    <Property Id="CREATEFIREWALLRULE" Value="0" />
-    <Property Id="ACTIONTIMEOUTSECONDS" Value="30" />
-    <Property Id="LOGPATH" Value="C:\ProgramData\DirectoryAnalyzerAgent\Logs\agent.log" />
-    <Property Id="DOMAIN" Value="" />
-    <Property Id="MAXREQUESTBYTES" Value="65536" />
-    <Property Id="REQUESTCLOCKSKEWSECONDS" Value="300" />
-    <Property Id="REPLAYCACHEMINUTES" Value="10" />
-    <Property Id="REQUIRESIGNEDREQUESTS" Value="1" />
-    <Property Id="MAXREQUESTSPERMINUTE" Value="60" />
-    <Property Id="MAXCONCURRENTREQUESTS" Value="10" />
-    <Property Id="ENFORCEREVOCATIONCHECK" Value="1" />
+
+    <!-- Conexão de saída com o Broker. BROKERURL é obrigatório e precisa ser https://. -->
+    <Property Id="BROKERURL" Secure="yes" />
+    <Property Id="AGENTID" Secure="yes" />
+    <Property Id="BROKERCLIENTCERTTHUMBPRINT" Secure="yes" />
+    <Property Id="DOMAIN" Secure="yes" />
+    <Property Id="ACTIONTIMEOUTSECONDS" Value="30" Secure="yes" />
+    <Property Id="LOGPATH" Value="C:\ProgramData\DirectoryAnalyzerAgent\Logs\agent.log" Secure="yes" />
+
+    <!-- Em atualizações, reaproveita os valores já gravados quando não forem informados de novo. -->
+    <Property Id="SAVED_BROKERURL">
+      <RegistrySearch Id="SavedBrokerUrl" Root="HKLM" Key="SOFTWARE\DirectoryAnalyzer\Agent" Name="BrokerUrl" Type="raw" Win64="yes" />
+    </Property>
+    <Property Id="SAVED_AGENTID">
+      <RegistrySearch Id="SavedAgentId" Root="HKLM" Key="SOFTWARE\DirectoryAnalyzer\Agent" Name="AgentId" Type="raw" Win64="yes" />
+    </Property>
+    <Property Id="SAVED_BROKERCLIENTCERTTHUMBPRINT">
+      <RegistrySearch Id="SavedBrokerClientCert" Root="HKLM" Key="SOFTWARE\DirectoryAnalyzer\Agent" Name="BrokerClientCertificateThumbprint" Type="raw" Win64="yes" />
+    </Property>
+    <SetProperty Id="BROKERURL" Value="[SAVED_BROKERURL]" Before="LaunchConditions" Sequence="both">NOT BROKERURL AND SAVED_BROKERURL</SetProperty>
+    <SetProperty Id="BROKERCLIENTCERTTHUMBPRINT" Value="[SAVED_BROKERCLIENTCERTTHUMBPRINT]" Before="LaunchConditions" Sequence="both">NOT BROKERCLIENTCERTTHUMBPRINT AND SAVED_BROKERCLIENTCERTTHUMBPRINT</SetProperty>
+    <SetProperty Id="AGENTID" Action="SetAgentIdFromSaved" Value="[SAVED_AGENTID]" Before="LaunchConditions" Sequence="both">NOT AGENTID AND SAVED_AGENTID</SetProperty>
+    <SetProperty Id="AGENTID" Action="SetAgentIdDefault" Value="[ComputerName]" After="SetAgentIdFromSaved" Sequence="both">NOT AGENTID</SetProperty>
+
+    <Condition Message="BROKERURL é obrigatório e deve começar com https:// (ex.: BROKERURL=https://broker.example/agent-hub).">
+      <![CDATA[Installed OR REMOVE~="ALL" OR (BROKERURL ~<< "https://")]]>
+    </Condition>
+
+    <!-- SIDs conhecidos resolvidos no idioma do sistema (ex.: pt-BR "Administradores"). -->
+    <PropertyRef Id="WIX_ACCOUNT_LOCALSYSTEM" />
+    <PropertyRef Id="WIX_ACCOUNT_ADMINISTRATORS" />
+    <PropertyRef Id="WIX_ACCOUNT_NETWORKSERVICE" />
 
     <Directory Id="TARGETDIR" Name="SourceDir">
-      <Directory Id="ProgramFilesFolder">
+      <Directory Id="ProgramFiles64Folder">
         <Directory Id="AgentInstallFolder" Name="DirectoryAnalyzerAgent" />
       </Directory>
       <Directory Id="CommonAppDataFolder">
-        <Directory Id="ProgramDataFolder" Name="DirectoryAnalyzerAgent" />
+        <Directory Id="ProgramDataFolder" Name="DirectoryAnalyzerAgent">
+          <Directory Id="ProgramDataLogsFolder" Name="Logs" />
+        </Directory>
       </Directory>
     </Directory>
 
-    <ComponentGroup Id="AgentComponents">
-      <Component Id="AgentExeComponent" Guid="{2F35D74E-5DA4-4A2F-9A1E-6D6F1B9FE0F0}" Directory="AgentInstallFolder">
-        <File Id="AgentExe" Source="$(var.AgentService.TargetDir)DirectoryAnalyzer.Agent.exe" KeyPath="yes" />
-        <File Id="AgentContractsDll" Source="$(var.AgentService.TargetDir)DirectoryAnalyzer.Agent.Contracts.dll" />
+    <ComponentGroup Id="AgentComponents" Directory="AgentInstallFolder">
+      <Component Id="AgentExeComponent" Guid="{95595997-8651-4827-9B09-B9246764E796}">
+        <File Id="AgentExe" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)DirectoryAnalyzer.Agent.exe" KeyPath="yes" />
+        <File Id="AgentExeConfig" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)DirectoryAnalyzer.Agent.exe.config" />
         <ServiceInstall Id="AgentServiceInstall"
                         Type="ownProcess"
                         Name="DirectoryAnalyzerAgent"
                         DisplayName="DirectoryAnalyzer Agent"
-                        Description="DirectoryAnalyzer on-prem agent service"
+                        Description="Agente do DirectoryAnalyzer: conexão de saída com o Broker e inventário local de leitura."
                         Start="auto"
                         ErrorControl="normal"
                         Account="[SERVICEACCOUNT]"
                         Password="[SERVICEPASSWORD]" />
         <ServiceControl Id="StartAgentService" Name="DirectoryAnalyzerAgent" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
       </Component>
-      <Component Id="AgentConfigComponent" Guid="{90B4A7B6-6B69-4C12-99B3-9A09E2B0D1FA}" Directory="ProgramDataFolder">
-        <CreateFolder />
+
+      <!-- Dependências de DirectoryAnalyzer.Agent (net48). Lista conferida por InstallerPackagingTests. -->
+      <Component Id="AgentLibrariesComponent" Guid="{0E8C3C2B-7C61-4E1D-A8B2-3F0B6E1D9A41}">
+        <File Id="DirectoryAnalyzer.Agent.Contracts.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)DirectoryAnalyzer.Agent.Contracts.dll" KeyPath="yes" />
+        <File Id="DirectoryAnalyzer.Collectors.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)DirectoryAnalyzer.Collectors.dll" />
+        <File Id="DirectoryAnalyzer.Contracts.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)DirectoryAnalyzer.Contracts.dll" />
+        <File Id="Microsoft.AspNetCore.Connections.Abstractions.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)Microsoft.AspNetCore.Connections.Abstractions.dll" />
+        <File Id="Microsoft.AspNetCore.Http.Connections.Client.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)Microsoft.AspNetCore.Http.Connections.Client.dll" />
+        <File Id="Microsoft.AspNetCore.Http.Connections.Common.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)Microsoft.AspNetCore.Http.Connections.Common.dll" />
+        <File Id="Microsoft.AspNetCore.SignalR.Client.Core.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)Microsoft.AspNetCore.SignalR.Client.Core.dll" />
+        <File Id="Microsoft.AspNetCore.SignalR.Client.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)Microsoft.AspNetCore.SignalR.Client.dll" />
+        <File Id="Microsoft.AspNetCore.SignalR.Common.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)Microsoft.AspNetCore.SignalR.Common.dll" />
+        <File Id="Microsoft.AspNetCore.SignalR.Protocols.Json.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)Microsoft.AspNetCore.SignalR.Protocols.Json.dll" />
+        <File Id="Microsoft.Bcl.AsyncInterfaces.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)Microsoft.Bcl.AsyncInterfaces.dll" />
+        <File Id="Microsoft.Extensions.DependencyInjection.Abstractions.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)Microsoft.Extensions.DependencyInjection.Abstractions.dll" />
+        <File Id="Microsoft.Extensions.DependencyInjection.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)Microsoft.Extensions.DependencyInjection.dll" />
+        <File Id="Microsoft.Extensions.Features.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)Microsoft.Extensions.Features.dll" />
+        <File Id="Microsoft.Extensions.Logging.Abstractions.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)Microsoft.Extensions.Logging.Abstractions.dll" />
+        <File Id="Microsoft.Extensions.Logging.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)Microsoft.Extensions.Logging.dll" />
+        <File Id="Microsoft.Extensions.Options.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)Microsoft.Extensions.Options.dll" />
+        <File Id="Microsoft.Extensions.Primitives.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)Microsoft.Extensions.Primitives.dll" />
+        <File Id="System.Buffers.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)System.Buffers.dll" />
+        <File Id="System.Diagnostics.DiagnosticSource.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)System.Diagnostics.DiagnosticSource.dll" />
+        <File Id="System.IO.Pipelines.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)System.IO.Pipelines.dll" />
+        <File Id="System.Memory.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)System.Memory.dll" />
+        <File Id="System.Numerics.Vectors.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)System.Numerics.Vectors.dll" />
+        <File Id="System.Runtime.CompilerServices.Unsafe.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)System.Runtime.CompilerServices.Unsafe.dll" />
+        <File Id="System.Text.Encodings.Web.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)System.Text.Encodings.Web.dll" />
+        <File Id="System.Text.Json.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)System.Text.Json.dll" />
+        <File Id="System.Threading.Channels.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)System.Threading.Channels.dll" />
+        <File Id="System.Threading.Tasks.Extensions.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)System.Threading.Tasks.Extensions.dll" />
+        <File Id="System.ValueTuple.dll" Source="$(var.DirectoryAnalyzer.Agent.TargetDir)System.ValueTuple.dll" />
+        <!-- System.Management.Automation.dll NÃO é empacotado: é o assembly de referência do pacote
+             Microsoft.PowerShell.5.ReferenceAssemblies; em execução vale o do Windows (GAC). -->
       </Component>
-      <Component Id="AgentRegistryComponent" Guid="{6D7A6F8E-58F1-4BB1-9CE4-4A72346A0A55}" Directory="ProgramDataFolder">
+    </ComponentGroup>
+
+    <!--
+      ProgramData guarda agentsettings.json e os logs. A ACL substitui a herdada de ProgramData, que
+      deixaria usuários locais criarem agentsettings.json antes do serviço.
+    -->
+    <ComponentGroup Id="AgentDataComponents">
+      <Component Id="AgentConfigFolderComponent" Guid="{2BCBD8B1-35E5-411A-8FFA-3DCC102F7DE8}" Directory="ProgramDataFolder">
+        <CreateFolder>
+          <Permission User="[WIX_ACCOUNT_LOCALSYSTEM]" GenericAll="yes" />
+          <Permission User="[WIX_ACCOUNT_ADMINISTRATORS]" GenericAll="yes" />
+          <Permission User="[WIX_ACCOUNT_NETWORKSERVICE]" GenericRead="yes" GenericWrite="yes" GenericExecute="yes" Delete="yes" />
+        </CreateFolder>
+      </Component>
+      <Component Id="AgentLogsFolderComponent" Guid="{C3D9B1F4-2A7E-4F86-9B0C-5E1A7D2C8F63}" Directory="ProgramDataLogsFolder">
+        <CreateFolder>
+          <Permission User="[WIX_ACCOUNT_LOCALSYSTEM]" GenericAll="yes" />
+          <Permission User="[WIX_ACCOUNT_ADMINISTRATORS]" GenericAll="yes" />
+          <Permission User="[WIX_ACCOUNT_NETWORKSERVICE]" GenericRead="yes" GenericWrite="yes" GenericExecute="yes" Delete="yes" />
+        </CreateFolder>
+      </Component>
+
+      <!--
+        Configuração lida por AgentConfigLoader (HKLM tem precedência sobre agentsettings.json).
+        Sem BindPrefix, CertThumbprint ou listas de clientes: o agente não aceita conexões de entrada.
+      -->
+      <Component Id="AgentRegistryComponent" Guid="{C87981C6-7A5E-4D94-9934-CD1B3EB3FF8C}" Directory="ProgramDataFolder">
         <RegistryKey Root="HKLM" Key="SOFTWARE\DirectoryAnalyzer\Agent">
-          <RegistryValue Name="BindPrefix" Type="string" Value="[BINDPREFIX]" KeyPath="yes" />
-          <RegistryValue Name="CertThumbprint" Type="string" Value="[CERTTHUMBPRINT]" />
-          <RegistryValue Name="AnalyzerClientThumbprints" Type="string" Value="[ALLOWEDCLIENTCERTTHUMBPRINTS]" />
-          <RegistryValue Name="TrustedCaThumbprints" Type="string" Value="[TRUSTEDCATHUMBPRINTS]" />
+          <RegistryValue Name="BrokerUrl" Type="string" Value="[BROKERURL]" KeyPath="yes" />
+          <RegistryValue Name="AgentId" Type="string" Value="[AGENTID]" />
+          <RegistryValue Name="BrokerClientCertificateThumbprint" Type="string" Value="[BROKERCLIENTCERTTHUMBPRINT]" />
+          <RegistryValue Name="Domain" Type="string" Value="[DOMAIN]" />
           <RegistryValue Name="ActionTimeoutSeconds" Type="integer" Value="[ACTIONTIMEOUTSECONDS]" />
           <RegistryValue Name="LogPath" Type="string" Value="[LOGPATH]" />
-          <RegistryValue Name="Domain" Type="string" Value="[DOMAIN]" />
-          <RegistryValue Name="MaxRequestBytes" Type="integer" Value="[MAXREQUESTBYTES]" />
-          <RegistryValue Name="RequestClockSkewSeconds" Type="integer" Value="[REQUESTCLOCKSKEWSECONDS]" />
-          <RegistryValue Name="ReplayCacheMinutes" Type="integer" Value="[REPLAYCACHEMINUTES]" />
-          <RegistryValue Name="RequireSignedRequests" Type="integer" Value="[REQUIRESIGNEDREQUESTS]" />
-          <RegistryValue Name="MaxRequestsPerMinute" Type="integer" Value="[MAXREQUESTSPERMINUTE]" />
-          <RegistryValue Name="MaxConcurrentRequests" Type="integer" Value="[MAXCONCURRENTREQUESTS]" />
-          <RegistryValue Name="EnforceRevocationCheck" Type="integer" Value="[ENFORCEREVOCATIONCHECK]" />
         </RegistryKey>
       </Component>
     </ComponentGroup>
 
-    <CustomAction Id="SetBindPrefix"
-                  Property="BINDPREFIX"
-                  Value="https://+:[LISTENPORT]/agent/"
-                  Execute="immediate" />
-    <CustomAction Id="CreateAgentConfig"
-                  Directory="ProgramDataFolder"
+    <!--
+      Remove, pelo nome, a regra de entrada criada pela versão 1.0.0.0 (CREATEFIREWALLRULE=1). A remoção
+      da versão anterior não a apagava, porque a condição REMOVE="all" nunca é verdadeira (o MSI usa "ALL").
+      Return="ignore": a ausência da regra (caso padrão) não é erro.
+    -->
+    <CustomAction Id="RemoveLegacyInboundFirewallRule"
+                  Directory="System64Folder"
                   Execute="deferred"
                   Impersonate="no"
-                  Return="check"
-                  ExeCommand="&quot;[SystemFolder]WindowsPowerShell\\v1.0\\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -Command &quot;$port=[int]''[LISTENPORT]''; $bindPrefix=&quot;&quot;https://+:$port/agent/&quot;&quot;; $allowed=''[ALLOWEDCLIENTCERTTHUMBPRINTS]''.Split('';'') | Where-Object { $_ -and $_.Trim() -ne '''' } | ForEach-Object { $_.Trim() }; $trusted=''[TRUSTEDCATHUMBPRINTS]''.Split('';'') | Where-Object { $_ -and $_.Trim() -ne '''' } | ForEach-Object { $_.Trim() }; $config=[ordered]@{ BindPrefix=$bindPrefix; CertThumbprint=''[CERTTHUMBPRINT]''; AnalyzerClientThumbprints=$allowed; TrustedCaThumbprints=$trusted; ActionTimeoutSeconds=[int]''[ACTIONTIMEOUTSECONDS]''; LogPath=''[LOGPATH]''; Domain=''[DOMAIN]''; MaxRequestBytes=[int]''[MAXREQUESTBYTES]''; RequestClockSkewSeconds=[int]''[REQUESTCLOCKSKEWSECONDS]''; ReplayCacheMinutes=[int]''[REPLAYCACHEMINUTES]''; RequireSignedRequests=([int]''[REQUIRESIGNEDREQUESTS]'' -ne 0); MaxRequestsPerMinute=[int]''[MAXREQUESTSPERMINUTE]''; MaxConcurrentRequests=[int]''[MAXCONCURRENTREQUESTS]''; EnforceRevocationCheck=([int]''[ENFORCEREVOCATIONCHECK]'' -ne 0) }; $configPath=''[ProgramDataFolder]agentsettings.json''; $configDir=Split-Path $configPath; New-Item -ItemType Directory -Path $configDir -Force | Out-Null; $config | ConvertTo-Json -Depth 6 | Set-Content -Path $configPath -Encoding UTF8&quot;" />
-    <CustomAction Id="AddFirewallRule"
-                  Directory="SystemFolder"
-                  Execute="deferred"
-                  Impersonate="no"
-                  Return="check"
-                  ExeCommand="&quot;[SystemFolder]netsh.exe&quot; advfirewall firewall add rule name=&quot;DirectoryAnalyzer Agent&quot; dir=in action=allow protocol=TCP localport=[LISTENPORT]" />
-    <CustomAction Id="RemoveFirewallRule"
-                  Directory="SystemFolder"
-                  Execute="deferred"
-                  Impersonate="no"
-                  Return="check"
-                  ExeCommand="&quot;[SystemFolder]netsh.exe&quot; advfirewall firewall delete rule name=&quot;DirectoryAnalyzer Agent&quot; protocol=TCP localport=[LISTENPORT]" />
+                  Return="ignore"
+                  ExeCommand="&quot;[System64Folder]netsh.exe&quot; advfirewall firewall delete rule name=&quot;DirectoryAnalyzer Agent&quot;" />
 
     <InstallExecuteSequence>
-      <Custom Action="SetBindPrefix" Before="InstallInitialize">NOT REMOVE="all"</Custom>
-      <Custom Action="CreateAgentConfig" After="InstallFiles">NOT REMOVE="all"</Custom>
-      <Custom Action="AddFirewallRule" After="CreateAgentConfig">CREATEFIREWALLRULE=1 AND NOT REMOVE="all"</Custom>
-      <Custom Action="RemoveFirewallRule" Before="RemoveFiles">REMOVE="all"</Custom>
+      <Custom Action="RemoveLegacyInboundFirewallRule" After="InstallFiles">NOT REMOVE~="ALL"</Custom>
     </InstallExecuteSequence>
 
     <Feature Id="AgentFeature" Title="DirectoryAnalyzer Agent" Level="1">
       <ComponentGroupRef Id="AgentComponents" />
+      <ComponentGroupRef Id="AgentDataComponents" />
     </Feature>
   </Product>
 </Wix>
