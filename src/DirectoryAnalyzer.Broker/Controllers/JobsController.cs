@@ -87,10 +87,34 @@ namespace DirectoryAnalyzer.Broker.Controllers
 
             var connectionId = connections.First();
             var jobId = _jobStore.CreateJob(request, connectionId);
-            await _hubContext.Clients.Client(connectionId).DispatchJob(jobId, request);
+
+            // A conexão pode ter caído entre a seleção e a criação do job. O Hub retira a conexão do registro
+            // antes de varrer os jobs dela; conferir de novo aqui fecha a janela: se ela sumiu, o job é
+            // encerrado já (uma única vez, via TryFinish) e a WPF recebe a causa sem esperar o timeout.
+            if (!IsStillConnected(connectionId, targets[0]))
+            {
+                _jobStore.TryFinish(jobId, JobState.Failed, AgentHub.AgentDisconnectedMessage);
+                return Conflict(new BrokerError(BrokerErrorCodes.AgentUnavailable, "O agente alvo desconectou antes do despacho; o job foi encerrado."));
+            }
+
+            try
+            {
+                await _hubContext.Clients.Client(connectionId).DispatchJob(jobId, request);
+            }
+            catch (Exception)
+            {
+                _jobStore.TryFinish(jobId, JobState.Failed, AgentHub.AgentDisconnectedMessage);
+                return Conflict(new BrokerError(BrokerErrorCodes.AgentUnavailable, "Falha ao entregar o job ao agente; o job foi encerrado."));
+            }
 
             var status = _jobStore.GetStatus(jobId);
             return Ok(status);
+        }
+
+        private bool IsStillConnected(string connectionId, string agentId)
+        {
+            return _agentRegistry.TryGetAgentByConnection(connectionId, out var agent)
+                && string.Equals(agent.AgentId, agentId, StringComparison.OrdinalIgnoreCase);
         }
 
         [HttpGet("{id}")]

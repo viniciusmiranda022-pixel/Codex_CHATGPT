@@ -8,8 +8,9 @@ namespace DirectoryAnalyzer.Agent.Modules
 {
     public sealed class ModuleExecutionOutcome
     {
-        private ModuleExecutionOutcome(bool succeeded, IReadOnlyList<IReadOnlyDictionary<string, string>> rows, string errorCode, string errorMessage, string errorDetails)
+        private ModuleExecutionOutcome(bool succeeded, IReadOnlyList<IReadOnlyDictionary<string, string>> rows, string errorCode, string errorMessage, string errorDetails, DirectoryQueryScope scope = null)
         {
+            Scope = scope;
             Succeeded = succeeded;
             Rows = rows ?? Array.Empty<IReadOnlyDictionary<string, string>>();
             ErrorCode = errorCode;
@@ -23,8 +24,11 @@ namespace DirectoryAnalyzer.Agent.Modules
         public string ErrorMessage { get; }
         public string ErrorDetails { get; }
 
-        public static ModuleExecutionOutcome Success(IReadOnlyList<IReadOnlyDictionary<string, string>> rows)
-            => new ModuleExecutionOutcome(true, rows, null, null, null);
+        /// <summary>Escopo LDAP efetivo da coleta; define o domínio do ModuleResult e o filtro de DNs.</summary>
+        public DirectoryQueryScope Scope { get; }
+
+        public static ModuleExecutionOutcome Success(IReadOnlyList<IReadOnlyDictionary<string, string>> rows, DirectoryQueryScope scope = null)
+            => new ModuleExecutionOutcome(true, rows, null, null, null, scope);
 
         public static ModuleExecutionOutcome Failure(string code, string message, string details = null)
             => new ModuleExecutionOutcome(false, null, code, message, details);
@@ -44,6 +48,8 @@ namespace DirectoryAnalyzer.Agent.Modules
     {
         public const string GateExceptionType = "AgentGate";
         public const string RejectedSummary = "Recusado pelo agente antes da execução";
+        public const string OutOfScopeCode = "OutOfScopeDiscarded";
+        public const string DistinguishedNameColumn = "DistinguishedName";
 
         private readonly ModuleRequestGate _gate;
         private readonly IModuleExecutor _executor;
@@ -105,8 +111,24 @@ namespace DirectoryAnalyzer.Agent.Modules
 
             if (outcome.Succeeded)
             {
+                var scope = outcome.Scope;
+                if (scope != null)
+                {
+                    // O domínio do resultado é o efetivamente consultado (RootDSE), não o texto da configuração.
+                    result.Domain = scope.DomainDnsName;
+                }
+
+                var discarded = 0;
                 foreach (var row in outcome.Rows)
                 {
+                    if (scope != null
+                        && (!row.TryGetValue(DistinguishedNameColumn, out var dn) || !scope.Contains(decision.Module.Name, dn)))
+                    {
+                        // Linha sem DN ou de outro domínio (ex.: referência seguida indevidamente) não sai do agente.
+                        discarded++;
+                        continue;
+                    }
+
                     var item = new ResultItem { Severity = ResultSeverity.Info };
                     foreach (var column in row)
                     {
@@ -116,7 +138,18 @@ namespace DirectoryAnalyzer.Agent.Modules
                     result.Items.Add(item);
                 }
 
-                result.Summary = $"Itens: {result.Items.Count}";
+                result.Summary = scope == null
+                    ? $"Itens: {result.Items.Count}"
+                    : $"Itens: {result.Items.Count} · Domínio: {scope.DomainDnsName} · Referências LDAP: {DirectoryQueryScope.ReferralPolicy}";
+                if (discarded > 0)
+                {
+                    result.Errors.Add(new ErrorInfo
+                    {
+                        Code = OutOfScopeCode,
+                        Message = $"{discarded} objeto(s) fora de {scope.DomainNamingContext} foram descartados pelo agente.",
+                        ExceptionType = GateExceptionType
+                    });
+                }
             }
             else
             {

@@ -19,12 +19,12 @@ namespace DirectoryAnalyzer.Agent
 
         private static readonly HashSet<string> NoParametersAllowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        private readonly Dictionary<string, Func<AgentRequest, AgentConfig, CancellationToken, Task<AgentResponse>>> _actions;
+        private readonly Dictionary<string, Func<AgentRequest, AgentConfig, DirectoryQueryScope, CancellationToken, Task<AgentResponse>>> _actions;
         private readonly PowerShellCollector _powerShellCollector = new PowerShellCollector();
 
         public ActionRegistry()
         {
-            _actions = new Dictionary<string, Func<AgentRequest, AgentConfig, CancellationToken, Task<AgentResponse>>>(
+            _actions = new Dictionary<string, Func<AgentRequest, AgentConfig, DirectoryQueryScope, CancellationToken, Task<AgentResponse>>>(
                 StringComparer.OrdinalIgnoreCase)
             {
                 { "GetUsers", GetUsersAsync },
@@ -32,20 +32,26 @@ namespace DirectoryAnalyzer.Agent
                 { "GetComputers", GetComputersAsync },
                 { "GetGpos", GetGposAsync },
                 { "GetDnsZones", GetDnsZonesAsync },
-                { "ScheduledTasksAnalyzer", (request, config, token) => RunPowerShellModuleAsync("ScheduledTasksAnalyzer", request, config, token) },
-                { "SmbSharesAnalyzer", (request, config, token) => RunPowerShellModuleAsync("SmbSharesAnalyzer", request, config, token) },
-                { "InstalledServicesAnalyzer", (request, config, token) => RunPowerShellModuleAsync("InstalledServicesAnalyzer", request, config, token) },
-                { "LocalProfilesAnalyzer", (request, config, token) => RunPowerShellModuleAsync("LocalProfilesAnalyzer", request, config, token) },
-                { "LocalSecurityPolicyAnalyzer", (request, config, token) => RunPowerShellModuleAsync("LocalSecurityPolicyAnalyzer", request, config, token) },
-                { "IisAppPoolsAnalyzer", (request, config, token) => RunPowerShellModuleAsync("IisAppPoolsAnalyzer", request, config, token) },
-                { "ProxyAddressAnalyzer", (request, config, token) => RunPowerShellModuleAsync("ProxyAddressAnalyzer", request, config, token) },
-                { "TrustsAnalyzer", (request, config, token) => RunPowerShellModuleAsync("TrustsAnalyzer", request, config, token) },
-                { "GpoAnalyzer", (request, config, token) => RunPowerShellModuleAsync("GpoAnalyzer", request, config, token) },
-                { "DnsAnalyzer", (request, config, token) => RunPowerShellModuleAsync("DnsAnalyzer", request, config, token) }
+                { "ScheduledTasksAnalyzer", (request, config, scope, token) => RunPowerShellModuleAsync("ScheduledTasksAnalyzer", request, config, token) },
+                { "SmbSharesAnalyzer", (request, config, scope, token) => RunPowerShellModuleAsync("SmbSharesAnalyzer", request, config, token) },
+                { "InstalledServicesAnalyzer", (request, config, scope, token) => RunPowerShellModuleAsync("InstalledServicesAnalyzer", request, config, token) },
+                { "LocalProfilesAnalyzer", (request, config, scope, token) => RunPowerShellModuleAsync("LocalProfilesAnalyzer", request, config, token) },
+                { "LocalSecurityPolicyAnalyzer", (request, config, scope, token) => RunPowerShellModuleAsync("LocalSecurityPolicyAnalyzer", request, config, token) },
+                { "IisAppPoolsAnalyzer", (request, config, scope, token) => RunPowerShellModuleAsync("IisAppPoolsAnalyzer", request, config, token) },
+                { "ProxyAddressAnalyzer", (request, config, scope, token) => RunPowerShellModuleAsync("ProxyAddressAnalyzer", request, config, token) },
+                { "TrustsAnalyzer", (request, config, scope, token) => RunPowerShellModuleAsync("TrustsAnalyzer", request, config, token) },
+                { "GpoAnalyzer", (request, config, scope, token) => RunPowerShellModuleAsync("GpoAnalyzer", request, config, token) },
+                { "DnsAnalyzer", (request, config, scope, token) => RunPowerShellModuleAsync("DnsAnalyzer", request, config, token) }
             };
         }
 
-        public async Task<AgentResponse> ExecuteAsync(AgentRequest request, AgentConfig config, CancellationToken token)
+        public Task<AgentResponse> ExecuteAsync(AgentRequest request, AgentConfig config, CancellationToken token)
+        {
+            return ExecuteAsync(request, config, null, token);
+        }
+
+        /// <summary>Executa com o escopo LDAP já resolvido pelo chamador (o mesmo que vai para o ModuleResult).</summary>
+        public async Task<AgentResponse> ExecuteAsync(AgentRequest request, AgentConfig config, DirectoryQueryScope scope, CancellationToken token)
         {
             if (!_actions.TryGetValue(request.ActionName, out var action))
             {
@@ -57,7 +63,7 @@ namespace DirectoryAnalyzer.Agent
 
             try
             {
-                return await action(request, config, timeoutCts.Token).ConfigureAwait(false);
+                return await action(request, config, scope, timeoutCts.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -69,7 +75,7 @@ namespace DirectoryAnalyzer.Agent
             }
         }
 
-        private static Task<AgentResponse> GetUsersAsync(AgentRequest request, AgentConfig config, CancellationToken token)
+        private static Task<AgentResponse> GetUsersAsync(AgentRequest request, AgentConfig config, DirectoryQueryScope scope, CancellationToken token)
         {
             if (!ValidateParameters(request.Parameters, AllowedUserParameters, out var error))
             {
@@ -84,7 +90,7 @@ namespace DirectoryAnalyzer.Agent
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var results = new GetUsersResult();
 
-            var searchBase = DirectorySearchBases.For("GetUsers", ReadRootDse(config))[0];
+            var searchBase = ResolveScope(scope, config).BasesFor("GetUsers")[0];
             using var entry = CreateDirectoryEntry(config, searchBase);
             using var searcher = CreateSearcher(entry);
 
@@ -128,7 +134,7 @@ namespace DirectoryAnalyzer.Agent
             return Task.FromResult(AgentResponse.Success(request.RequestId, stopwatch.ElapsedMilliseconds, results));
         }
 
-        private static Task<AgentResponse> GetGroupsAsync(AgentRequest request, AgentConfig config, CancellationToken token)
+        private static Task<AgentResponse> GetGroupsAsync(AgentRequest request, AgentConfig config, DirectoryQueryScope scope, CancellationToken token)
         {
             if (!ValidateParameters(request.Parameters, NoParametersAllowed, out var error))
             {
@@ -138,7 +144,7 @@ namespace DirectoryAnalyzer.Agent
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var results = new GetGroupsResult();
 
-            var searchBase = DirectorySearchBases.For("GetGroups", ReadRootDse(config))[0];
+            var searchBase = ResolveScope(scope, config).BasesFor("GetGroups")[0];
             using var entry = CreateDirectoryEntry(config, searchBase);
             using var searcher = CreateSearcher(entry);
             searcher.Filter = "(objectCategory=group)";
@@ -168,7 +174,7 @@ namespace DirectoryAnalyzer.Agent
             return Task.FromResult(AgentResponse.Success(request.RequestId, stopwatch.ElapsedMilliseconds, results));
         }
 
-        private static Task<AgentResponse> GetComputersAsync(AgentRequest request, AgentConfig config, CancellationToken token)
+        private static Task<AgentResponse> GetComputersAsync(AgentRequest request, AgentConfig config, DirectoryQueryScope scope, CancellationToken token)
         {
             if (!ValidateParameters(request.Parameters, NoParametersAllowed, out var error))
             {
@@ -178,7 +184,7 @@ namespace DirectoryAnalyzer.Agent
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var results = new GetComputersResult();
 
-            var searchBase = DirectorySearchBases.For("GetComputers", ReadRootDse(config))[0];
+            var searchBase = ResolveScope(scope, config).BasesFor("GetComputers")[0];
             using var entry = CreateDirectoryEntry(config, searchBase);
             using var searcher = CreateSearcher(entry);
             searcher.Filter = "(objectCategory=computer)";
@@ -208,7 +214,7 @@ namespace DirectoryAnalyzer.Agent
             return Task.FromResult(AgentResponse.Success(request.RequestId, stopwatch.ElapsedMilliseconds, results));
         }
 
-        private static Task<AgentResponse> GetGposAsync(AgentRequest request, AgentConfig config, CancellationToken token)
+        private static Task<AgentResponse> GetGposAsync(AgentRequest request, AgentConfig config, DirectoryQueryScope scope, CancellationToken token)
         {
             if (!ValidateParameters(request.Parameters, NoParametersAllowed, out var error))
             {
@@ -218,7 +224,7 @@ namespace DirectoryAnalyzer.Agent
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var results = new GetGposResult();
 
-            var policiesDn = DirectorySearchBases.For("GetGpos", ReadRootDse(config))[0];
+            var policiesDn = ResolveScope(scope, config).BasesFor("GetGpos")[0];
             using var entry = CreateDirectoryEntry(config, policiesDn);
             using var searcher = CreateSearcher(entry);
             searcher.Filter = "(objectClass=groupPolicyContainer)";
@@ -246,7 +252,7 @@ namespace DirectoryAnalyzer.Agent
             return Task.FromResult(AgentResponse.Success(request.RequestId, stopwatch.ElapsedMilliseconds, results));
         }
 
-        private static Task<AgentResponse> GetDnsZonesAsync(AgentRequest request, AgentConfig config, CancellationToken token)
+        private static Task<AgentResponse> GetDnsZonesAsync(AgentRequest request, AgentConfig config, DirectoryQueryScope scope, CancellationToken token)
         {
             if (!ValidateParameters(request.Parameters, NoParametersAllowed, out var error))
             {
@@ -257,7 +263,7 @@ namespace DirectoryAnalyzer.Agent
             var results = new GetDnsZonesResult();
 
             // Somente a partição DNS do domínio do agente (ver DirectorySearchBases).
-            foreach (var baseDn in DirectorySearchBases.For("GetDnsZones", ReadRootDse(config)))
+            foreach (var baseDn in ResolveScope(scope, config).BasesFor("GetDnsZones"))
             {
                 token.ThrowIfCancellationRequested();
                 using var entry = CreateDirectoryEntry(config, baseDn);
@@ -352,11 +358,19 @@ namespace DirectoryAnalyzer.Agent
             return new DirectorySearcher(entry)
             {
                 SearchScope = SearchScope.Subtree,
-                PageSize = 500
+                PageSize = 500,
+                // Política explícita (DirectoryQueryScope.ReferralPolicy): não seguir referências LDAP para
+                // domínios filhos, pais ou externos. O padrão do DirectorySearcher (External) seguiria.
+                ReferralChasing = ReferralChasingOption.None
             };
         }
 
-        private static RootDseSnapshot ReadRootDse(AgentConfig config)
+        private static DirectoryQueryScope ResolveScope(DirectoryQueryScope scope, AgentConfig config)
+        {
+            return scope ?? DirectoryQueryScope.From(ReadRootDse(config));
+        }
+
+        public static RootDseSnapshot ReadRootDse(AgentConfig config)
         {
             using var rootDse = new DirectoryEntry(string.IsNullOrWhiteSpace(config.Domain)
                 ? "LDAP://RootDSE"

@@ -63,3 +63,142 @@ namespace DirectoryAnalyzer.Agent.Modules
         }
     }
 }
+
+namespace DirectoryAnalyzer.Agent.Modules
+{
+    /// <summary>
+    /// Escopo efetivo de uma coleta LDAP, derivado do RootDSE lido pelo próprio agente.
+    /// Política de referências: <see cref="ReferralPolicy"/> = None. O agente não segue referências LDAP
+    /// (subordinadas para domínios filhos nem externas para outros domínios/florestas); o servidor
+    /// devolve só objetos do naming context do domínio consultado. Como defesa adicional, o
+    /// AgentJobProcessor descarta qualquer linha cujo DN esteja fora de <see cref="DomainNamingContext"/>.
+    /// </summary>
+    public sealed class DirectoryQueryScope
+    {
+        /// <summary>Equivale a System.DirectoryServices.ReferralChasingOption.None.</summary>
+        public const string ReferralPolicy = "None";
+
+        private readonly RootDseSnapshot _rootDse;
+
+        private DirectoryQueryScope(RootDseSnapshot rootDse, string domainNamingContext)
+        {
+            _rootDse = rootDse;
+            DomainNamingContext = domainNamingContext;
+            DomainDnsName = ToDnsName(domainNamingContext);
+        }
+
+        public string DomainNamingContext { get; }
+
+        /// <summary>Nome DNS do domínio efetivamente consultado (ex.: filho.origem.example).</summary>
+        public string DomainDnsName { get; }
+
+        public static DirectoryQueryScope From(RootDseSnapshot rootDse)
+        {
+            var domainNc = rootDse?.DefaultNamingContext?.Trim();
+            if (string.IsNullOrEmpty(domainNc) || string.IsNullOrEmpty(ToDnsName(domainNc)))
+            {
+                throw new InvalidOperationException("defaultNamingContext indisponível; o agente não define o escopo da consulta.");
+            }
+
+            return new DirectoryQueryScope(rootDse, domainNc);
+        }
+
+        public IReadOnlyList<string> BasesFor(string moduleName) => DirectorySearchBases.For(moduleName, _rootDse);
+
+        /// <summary>
+        /// O DN pertence a uma das bases do módulo e não atravessa a fronteira de um domínio filho.
+        /// Sob a base do domínio (DC=...), um RDN DC= logo antes da base indica outro naming context
+        /// (domínio filho ou partição de aplicação) e é recusado. Sob bases CN= (Policies, MicrosoftDNS)
+        /// não há domínio aninhado, então qualquer descendente é aceito (ex.: zonas DNS "DC=zona,CN=MicrosoftDNS,...").
+        /// </summary>
+        public bool Contains(string moduleName, string distinguishedName)
+        {
+            if (string.IsNullOrWhiteSpace(distinguishedName))
+            {
+                return false;
+            }
+
+            var dn = distinguishedName.Trim();
+            foreach (var searchBase in BasesFor(moduleName))
+            {
+                if (string.Equals(dn, searchBase, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                if (!dn.EndsWith("," + searchBase, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (!searchBase.StartsWith("DC=", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                var relative = dn.Substring(0, dn.Length - searchBase.Length - 1);
+                var lastRdn = LastRdn(relative);
+                if (!lastRdn.StartsWith("DC=", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static string LastRdn(string relativeDn)
+        {
+            // Último separador não escapado ("\," faz parte do valor).
+            for (var i = relativeDn.Length - 1; i >= 0; i--)
+            {
+                if (relativeDn[i] != ',')
+                {
+                    continue;
+                }
+
+                var backslashes = 0;
+                for (var j = i - 1; j >= 0 && relativeDn[j] == '\\'; j--)
+                {
+                    backslashes++;
+                }
+
+                if (backslashes % 2 == 0)
+                {
+                    return relativeDn.Substring(i + 1).Trim();
+                }
+            }
+
+            return relativeDn.Trim();
+        }
+
+        public static string ToDnsName(string namingContext)
+        {
+            if (string.IsNullOrWhiteSpace(namingContext))
+            {
+                return null;
+            }
+
+            var labels = new List<string>();
+            foreach (var part in namingContext.Split(','))
+            {
+                var trimmed = part.Trim();
+                if (!trimmed.StartsWith("DC=", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Naming context de domínio só tem componentes DC=.
+                    return null;
+                }
+
+                var label = trimmed.Substring(3).Trim();
+                if (label.Length == 0)
+                {
+                    return null;
+                }
+
+                labels.Add(label.ToLowerInvariant());
+            }
+
+            return string.Join(".", labels);
+        }
+    }
+}

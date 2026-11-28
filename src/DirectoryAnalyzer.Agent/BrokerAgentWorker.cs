@@ -4,6 +4,7 @@ using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
+using DirectoryAnalyzer.Agent.Broker;
 using DirectoryAnalyzer.Agent.Contracts;
 using DirectoryAnalyzer.Agent.Modules;
 using DirectoryAnalyzer.Contracts;
@@ -31,22 +32,81 @@ namespace DirectoryAnalyzer.Agent
                 ModuleCatalog.CreateDefault(),
                 new ActionRegistryModuleExecutor(new ActionRegistry(), _config),
                 identity);
-            _connection = BuildConnection();
-            _connection.On<string, JobRequest>("DispatchJob", async (jobId, request) =>
-            {
-                await HandleJobAsync(jobId, request, token).ConfigureAwait(false);
-            });
 
-            await _connection.StartAsync(token).ConfigureAwait(false);
-            await _connection.InvokeAsync("AgentConnect", BuildDescriptor(), token).ConfigureAwait(false);
-            await Task.Delay(Timeout.Infinite, token).ConfigureAwait(false);
+            // Laço da sessão de saída: a reconexão automática não tem limite de tentativas e refaz o
+            // AgentConnect (AgentBrokerSession). Se a sessão ainda assim fechar, uma nova é aberta.
+            var restartDelay = TimeSpan.FromSeconds(2);
+            while (!token.IsCancellationRequested)
+            {
+                _connection = BuildConnection();
+                var closed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                _connection.Closed += _ =>
+                {
+                    closed.TrySetResult(true);
+                    return Task.CompletedTask;
+                };
+
+                var session = new AgentBrokerSession(
+                    _connection,
+                    BuildDescriptor,
+                    (jobId, request) => HandleJobAsync(jobId, request, token),
+                    message => LogSession("Info", message));
+
+                try
+                {
+                    await session.StartAsync(token).ConfigureAwait(false);
+                    restartDelay = TimeSpan.FromSeconds(2);
+                    using (token.Register(() => closed.TrySetResult(true)))
+                    {
+                        await closed.Task.ConfigureAwait(false);
+                    }
+                }
+                catch (OperationCanceledException) when (token.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    LogSession("Error", $"Falha ao conectar ao Broker ({ex.GetType().Name}); nova tentativa em {restartDelay.TotalSeconds:0}s.");
+                }
+
+                await DisposeConnectionAsync().ConfigureAwait(false);
+                if (token.IsCancellationRequested)
+                {
+                    break;
+                }
+
+                try
+                {
+                    await Task.Delay(restartDelay, token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+
+                restartDelay = TimeSpan.FromTicks(Math.Min(restartDelay.Ticks * 2, UnboundedRetryPolicy.MaxDelay.Ticks));
+            }
         }
 
         public async Task StopAsync()
         {
-            if (_connection != null)
+            await DisposeConnectionAsync().ConfigureAwait(false);
+        }
+
+        private async Task DisposeConnectionAsync()
+        {
+            var connection = _connection;
+            if (connection != null)
             {
-                await _connection.StopAsync().ConfigureAwait(false);
+                try
+                {
+                    await connection.DisposeAsync().ConfigureAwait(false);
+                }
+                catch (Exception)
+                {
+                    // Conexão já encerrada.
+                }
             }
         }
 
@@ -62,7 +122,7 @@ namespace DirectoryAnalyzer.Agent
                 }
             });
 
-            builder = builder.WithAutomaticReconnect();
+            builder = builder.WithAutomaticReconnect(new UnboundedRetryPolicy());
             return builder.Build();
         }
 
@@ -104,6 +164,18 @@ namespace DirectoryAnalyzer.Agent
             await _connection.InvokeAsync("SubmitResult", jobId, result, token).ConfigureAwait(false);
         }
 
+        private void LogSession(string status, string message)
+        {
+            try
+            {
+                _logger.Write(AgentLogger.Create(null, "BrokerSession", null, null, 0, status, null, message));
+            }
+            catch (Exception)
+            {
+                // Falha de log não derruba a sessão.
+            }
+        }
+
         private string ResolveAgentId()
         {
             return string.IsNullOrWhiteSpace(_config.AgentId) ? Environment.MachineName : _config.AgentId;
@@ -131,7 +203,19 @@ namespace DirectoryAnalyzer.Agent
                     Nonce = Guid.NewGuid().ToString("N")
                 };
 
-                var response = await _registry.ExecuteAsync(agentRequest, _config, token).ConfigureAwait(false);
+                // O escopo é resolvido uma vez a partir do RootDSE do próprio agente e usado tanto na consulta
+                // quanto na identificação do domínio do ModuleResult.
+                DirectoryQueryScope scope;
+                try
+                {
+                    scope = DirectoryQueryScope.From(ActionRegistry.ReadRootDse(_config));
+                }
+                catch (Exception ex)
+                {
+                    return ModuleExecutionOutcome.Failure("ScopeUnavailable", "O agente não conseguiu determinar o domínio local (RootDSE).", ex.GetType().Name);
+                }
+
+                var response = await _registry.ExecuteAsync(agentRequest, _config, scope, token).ConfigureAwait(false);
                 if (response.Status != AgentStatus.Success)
                 {
                     return ModuleExecutionOutcome.Failure(response.Error?.Code, response.Error?.Message, response.Error?.Details);
@@ -140,7 +224,7 @@ namespace DirectoryAnalyzer.Agent
                 var rows = ConvertPayloadToItems(response.Payload)
                     .Select(item => (IReadOnlyDictionary<string, string>)item.Columns)
                     .ToList();
-                return ModuleExecutionOutcome.Success(rows);
+                return ModuleExecutionOutcome.Success(rows, scope);
             }
 
             private static IEnumerable<ResultItem> ConvertPayloadToItems(object payload)

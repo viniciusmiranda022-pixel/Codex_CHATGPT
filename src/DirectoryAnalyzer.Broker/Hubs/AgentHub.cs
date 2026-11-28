@@ -24,28 +24,21 @@ namespace DirectoryAnalyzer.Broker.Hubs
 
         public override Task OnDisconnectedAsync(Exception exception)
         {
-            // Jobs vinculados a esta conexão não podem mais ser concluídos por outra; encerra como falha
-            // para que a WPF mostre "agente indisponível" em vez de esperar indefinidamente.
-            foreach (var jobId in _jobStore.ListJobIds())
-            {
-                if (!string.Equals(_jobStore.GetAssignedConnectionId(jobId), Context.ConnectionId, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                var status = _jobStore.GetStatus(jobId);
-                if (status != null && status.State != JobState.Completed && status.State != JobState.Failed)
-                {
-                    status.State = JobState.Failed;
-                    status.Message = AgentDisconnectedMessage;
-                    status.UpdatedAtUtc = DateTime.UtcNow;
-                    status.CompletedAtUtc = DateTime.UtcNow;
-                    _jobStore.TryUpdateStatus(jobId, status);
-                }
-            }
-
+            // Ordem importa: primeiro a conexão sai do registro, depois os jobs dela são encerrados.
+            // Assim, um despacho concorrente ou já vê a conexão ausente (e o próprio controller encerra o
+            // job) ou criou o job antes desta varredura (e ela o encerra). TryFinish garante um único fim.
             _agentRegistry.Unregister(Context.ConnectionId);
+            FailOpenJobs(_jobStore, Context.ConnectionId);
             return base.OnDisconnectedAsync(exception);
+        }
+
+        /// <summary>Encerra como falha os jobs abertos vinculados a uma conexão que não existe mais.</summary>
+        public static void FailOpenJobs(IJobStore jobStore, string connectionId)
+        {
+            foreach (var jobId in jobStore.ListOpenJobsForConnection(connectionId))
+            {
+                jobStore.TryFinish(jobId, JobState.Failed, AgentDisconnectedMessage);
+            }
         }
 
         public Task AgentConnect(AgentDescriptor agentInfo)
@@ -56,17 +49,13 @@ namespace DirectoryAnalyzer.Broker.Hubs
 
         public Task ProgressUpdate(string jobId, int progressPercent, string message)
         {
-            var status = _jobStore.GetStatus(jobId);
-            if (status == null || !IsCallerAssignedTo(jobId))
+            if (!IsCallerAssignedTo(jobId))
             {
                 return Task.CompletedTask;
             }
 
-            status.ProgressPercent = progressPercent;
-            status.Message = message;
-            status.State = JobState.Running;
-            status.UpdatedAtUtc = DateTime.UtcNow;
-            _jobStore.TryUpdateStatus(jobId, status);
+            // Progresso tardio não reabre um job já encerrado.
+            _jobStore.TryReportProgress(jobId, progressPercent, message);
             return Task.CompletedTask;
         }
 
@@ -74,26 +63,21 @@ namespace DirectoryAnalyzer.Broker.Hubs
         {
             // Só a conexão designada no despacho pode entregar o resultado; as demais são ignoradas,
             // inclusive outra conexão que declare o mesmo AgentId depois do despacho.
-            if (result == null || _jobStore.GetStatus(jobId) == null || !IsCallerAssignedTo(jobId))
+            if (result == null || !IsCallerAssignedTo(jobId)
+                || !_agentRegistry.TryGetAgentByConnection(Context.ConnectionId, out var caller))
             {
                 return Task.CompletedTask;
             }
 
-            _agentRegistry.TryGetAgentByConnection(Context.ConnectionId, out var caller);
             result.AgentId = caller.AgentId;
-            _resultStore.StoreResult(jobId, result);
-            var status = _jobStore.GetStatus(jobId);
-            if (status != null)
-            {
-                var failed = (result.Items == null || result.Items.Count == 0) && result.Errors != null && result.Errors.Count > 0;
-                status.State = failed ? JobState.Failed : JobState.Completed;
-                status.ProgressPercent = 100;
-                status.Message = failed ? $"Falha: {result.Errors[0].Code}" : "Concluído";
-                status.CompletedAtUtc = DateTime.UtcNow;
-                status.UpdatedAtUtc = DateTime.UtcNow;
-                _jobStore.TryUpdateStatus(jobId, status);
-            }
-
+            var failed = (result.Items == null || result.Items.Count == 0) && result.Errors != null && result.Errors.Count > 0;
+            _jobStore.TryFinish(
+                jobId,
+                failed ? JobState.Failed : JobState.Completed,
+                failed ? $"Falha: {result.Errors[0].Code}" : "Concluído",
+                // O resultado fica disponível antes de o estado terminal ser visível à WPF, e só se este
+                // for o primeiro encerramento (um job já encerrado por desconexão não recebe resultado).
+                () => _resultStore.StoreResult(jobId, result));
             return Task.CompletedTask;
         }
 
