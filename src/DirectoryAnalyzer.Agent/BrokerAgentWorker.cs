@@ -4,7 +4,9 @@ using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
+using DirectoryAnalyzer.Agent.Broker;
 using DirectoryAnalyzer.Agent.Contracts;
+using DirectoryAnalyzer.Agent.Modules;
 using DirectoryAnalyzer.Contracts;
 using Microsoft.AspNetCore.SignalR.Client;
 
@@ -15,7 +17,7 @@ namespace DirectoryAnalyzer.Agent
         private readonly AgentConfig _config;
         private readonly AgentLogger _logger;
         private HubConnection _connection;
-        private ActionRegistry _registry;
+        private AgentJobProcessor _processor;
 
         public BrokerAgentWorker(AgentConfig config)
         {
@@ -25,23 +27,86 @@ namespace DirectoryAnalyzer.Agent
 
         public async Task StartAsync(CancellationToken token)
         {
-            _registry = new ActionRegistry();
-            _connection = BuildConnection();
-            _connection.On<string, JobRequest>("DispatchJob", async (jobId, request) =>
-            {
-                await HandleJobAsync(jobId, request, token).ConfigureAwait(false);
-            });
+            var identity = new AgentIdentity(ResolveAgentId(), Environment.MachineName, _config.Domain);
+            _processor = new AgentJobProcessor(
+                ModuleCatalog.CreateDefault(),
+                new ActionRegistryModuleExecutor(new ActionRegistry(), _config),
+                identity);
 
-            await _connection.StartAsync(token).ConfigureAwait(false);
-            await _connection.InvokeAsync("AgentConnect", BuildDescriptor(), token).ConfigureAwait(false);
-            await Task.Delay(Timeout.Infinite, token).ConfigureAwait(false);
+            // Laço da sessão de saída: a reconexão automática não tem limite de tentativas e refaz o
+            // AgentConnect (AgentBrokerSession). Se a sessão ainda assim fechar, uma nova é aberta.
+            var restartDelay = TimeSpan.FromSeconds(2);
+            while (!token.IsCancellationRequested)
+            {
+                _connection = BuildConnection();
+                var closed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                _connection.Closed += _ =>
+                {
+                    closed.TrySetResult(true);
+                    return Task.CompletedTask;
+                };
+
+                var session = new AgentBrokerSession(
+                    _connection,
+                    BuildDescriptor,
+                    (jobId, request) => HandleJobAsync(jobId, request, token),
+                    message => LogSession("Info", message));
+
+                try
+                {
+                    await session.StartAsync(token).ConfigureAwait(false);
+                    restartDelay = TimeSpan.FromSeconds(2);
+                    using (token.Register(() => closed.TrySetResult(true)))
+                    {
+                        await closed.Task.ConfigureAwait(false);
+                    }
+                }
+                catch (OperationCanceledException) when (token.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    LogSession("Error", $"Falha ao conectar ao Broker ({ex.GetType().Name}); nova tentativa em {restartDelay.TotalSeconds:0}s.");
+                }
+
+                await DisposeConnectionAsync().ConfigureAwait(false);
+                if (token.IsCancellationRequested)
+                {
+                    break;
+                }
+
+                try
+                {
+                    await Task.Delay(restartDelay, token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+
+                restartDelay = TimeSpan.FromTicks(Math.Min(restartDelay.Ticks * 2, UnboundedRetryPolicy.MaxDelay.Ticks));
+            }
         }
 
         public async Task StopAsync()
         {
-            if (_connection != null)
+            await DisposeConnectionAsync().ConfigureAwait(false);
+        }
+
+        private async Task DisposeConnectionAsync()
+        {
+            var connection = _connection;
+            if (connection != null)
             {
-                await _connection.StopAsync().ConfigureAwait(false);
+                try
+                {
+                    await connection.DisposeAsync().ConfigureAwait(false);
+                }
+                catch (Exception)
+                {
+                    // Conexão já encerrada.
+                }
             }
         }
 
@@ -57,7 +122,7 @@ namespace DirectoryAnalyzer.Agent
                 }
             });
 
-            builder = builder.WithAutomaticReconnect();
+            builder = builder.WithAutomaticReconnect(new UnboundedRetryPolicy());
             return builder.Build();
         }
 
@@ -79,161 +144,174 @@ namespace DirectoryAnalyzer.Agent
         {
             return new AgentDescriptor
             {
-                AgentId = string.IsNullOrWhiteSpace(_config.AgentId) ? Environment.MachineName : _config.AgentId,
+                AgentId = ResolveAgentId(),
                 Host = Environment.MachineName,
                 Version = typeof(BrokerAgentWorker).Assembly.GetName().Version?.ToString(),
-                Capabilities = _config.Capabilities?.ToList() ?? new List<string>()
+                // Anuncia o catálogo efetivamente instalado, não uma lista configurável.
+                Capabilities = ModuleCatalog.CreateDefault().ModuleNames.ToList()
             };
         }
 
         private async Task HandleJobAsync(string jobId, JobRequest request, CancellationToken token)
         {
-            var correlationId = string.IsNullOrWhiteSpace(request.CorrelationId) ? jobId : request.CorrelationId;
-            await _connection.InvokeAsync("ProgressUpdate", jobId, 5, "Iniciado", token).ConfigureAwait(false);
-
-            var agentRequest = new AgentRequest
-            {
-                RequestId = jobId,
-                ActionName = request.ModuleName,
-                Parameters = request.Parameters ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-                TimestampUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                Nonce = Guid.NewGuid().ToString("N"),
-                CorrelationId = correlationId
-            };
-
-            var response = await _registry.ExecuteAsync(agentRequest, _config, token).ConfigureAwait(false);
-            var result = MapResponse(request, response, correlationId);
+            // O gate do agente decide antes de qualquer execução; recusas voltam como ModuleResult com ErrorInfo.
+            var result = await _processor.ProcessAsync(
+                jobId,
+                request,
+                (percent, message) => _connection.InvokeAsync("ProgressUpdate", jobId, percent, message, token),
+                token).ConfigureAwait(false);
 
             await _connection.InvokeAsync("SubmitResult", jobId, result, token).ConfigureAwait(false);
         }
 
-        private ModuleResult MapResponse(JobRequest request, AgentResponse response, string correlationId)
+        private void LogSession(string status, string message)
         {
-            var moduleName = request.ModuleName;
-            if (request.Parameters != null && request.Parameters.TryGetValue("ModuleName", out var moduleOverride)
-                && !string.IsNullOrWhiteSpace(moduleOverride))
+            try
             {
-                moduleName = moduleOverride;
+                _logger.Write(AgentLogger.Create(null, "BrokerSession", null, null, 0, status, null, message));
             }
-
-            var result = new ModuleResult
+            catch (Exception)
             {
-                CorrelationId = correlationId,
-                ModuleName = moduleName,
-                AgentId = string.IsNullOrWhiteSpace(_config.AgentId) ? Environment.MachineName : _config.AgentId,
-                Host = Environment.MachineName,
-                Domain = _config.Domain,
-                StartedAtUtc = DateTime.UtcNow,
-                CompletedAtUtc = DateTime.UtcNow
-            };
-
-            if (response.Status == AgentStatus.Success)
-            {
-                foreach (var item in ConvertPayloadToItems(response.Payload))
-                {
-                    result.Items.Add(item);
-                }
-
-                result.Summary = $"Itens: {result.Items.Count}";
+                // Falha de log não derruba a sessão.
             }
-            else
-            {
-                result.Errors.Add(new ErrorInfo
-                {
-                    Code = response.Error?.Code,
-                    Message = response.Error?.Message,
-                    Details = response.Error?.Details,
-                    ExceptionType = "AgentResponse"
-                });
-            }
-
-            return result;
         }
 
-        private IEnumerable<ResultItem> ConvertPayloadToItems(object payload)
+        private string ResolveAgentId()
         {
-            if (payload == null)
-            {
-                return Enumerable.Empty<ResultItem>();
-            }
-
-            if (payload is System.Collections.IDictionary dictionary)
-            {
-                return new[] { BuildItemFromDictionary(dictionary) };
-            }
-
-            if (payload is System.Collections.IEnumerable enumerable && !(payload is string))
-            {
-                return BuildItemsFromEnumerable(enumerable);
-            }
-
-            var collectionProperty = payload.GetType().GetProperties()
-                .FirstOrDefault(prop => prop.PropertyType != typeof(string)
-                    && typeof(System.Collections.IEnumerable).IsAssignableFrom(prop.PropertyType));
-
-            if (collectionProperty != null)
-            {
-                var collection = collectionProperty.GetValue(payload) as System.Collections.IEnumerable;
-                if (collection != null)
-                {
-                    return BuildItemsFromEnumerable(collection);
-                }
-            }
-
-            return new[] { BuildItemFromObject(payload) };
+            return string.IsNullOrWhiteSpace(_config.AgentId) ? Environment.MachineName : _config.AgentId;
         }
 
-        private IEnumerable<ResultItem> BuildItemsFromEnumerable(System.Collections.IEnumerable items)
+        private sealed class ActionRegistryModuleExecutor : IModuleExecutor
         {
-            var list = new List<ResultItem>();
-            foreach (var item in items)
-            {
-                if (item == null)
-                {
-                    continue;
-                }
+            private readonly ActionRegistry _registry;
+            private readonly AgentConfig _config;
 
-                if (item is System.Collections.IDictionary dictionary)
-                {
-                    list.Add(BuildItemFromDictionary(dictionary));
-                }
-                else
-                {
-                    list.Add(BuildItemFromObject(item));
-                }
+            public ActionRegistryModuleExecutor(ActionRegistry registry, AgentConfig config)
+            {
+                _registry = registry;
+                _config = config;
             }
 
-            return list;
-        }
-
-        private ResultItem BuildItemFromObject(object item)
-        {
-            var resultItem = new ResultItem { Severity = ResultSeverity.Info };
-            foreach (var prop in item.GetType().GetProperties())
+            public async Task<ModuleExecutionOutcome> ExecuteAsync(ModuleDefinition module, IReadOnlyDictionary<string, string> parameters, CancellationToken token)
             {
-                if (!prop.CanRead)
+                var agentRequest = new AgentRequest
                 {
-                    continue;
+                    RequestId = Guid.NewGuid().ToString("N"),
+                    ActionName = module.Name,
+                    Parameters = parameters.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase),
+                    TimestampUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                    Nonce = Guid.NewGuid().ToString("N")
+                };
+
+                // O escopo é resolvido uma vez a partir do RootDSE do próprio agente e usado tanto na consulta
+                // quanto na identificação do domínio do ModuleResult.
+                DirectoryQueryScope scope;
+                try
+                {
+                    scope = DirectoryQueryScope.From(ActionRegistry.ReadRootDse(_config));
+                }
+                catch (Exception ex)
+                {
+                    return ModuleExecutionOutcome.Failure("ScopeUnavailable", "O agente não conseguiu determinar o domínio local (RootDSE).", ex.GetType().Name);
                 }
 
-                var value = prop.GetValue(item);
-                resultItem.Columns[prop.Name] = value == null ? string.Empty : Convert.ToString(value);
+                var response = await _registry.ExecuteAsync(agentRequest, _config, scope, token).ConfigureAwait(false);
+                if (response.Status != AgentStatus.Success)
+                {
+                    return ModuleExecutionOutcome.Failure(response.Error?.Code, response.Error?.Message, response.Error?.Details);
+                }
+
+                var rows = ConvertPayloadToItems(response.Payload)
+                    .Select(item => (IReadOnlyDictionary<string, string>)item.Columns)
+                    .ToList();
+                return ModuleExecutionOutcome.Success(rows, scope);
             }
 
-            return resultItem;
-        }
-
-        private ResultItem BuildItemFromDictionary(System.Collections.IDictionary dictionary)
-        {
-            var resultItem = new ResultItem { Severity = ResultSeverity.Info };
-            foreach (var key in dictionary.Keys)
+            private static IEnumerable<ResultItem> ConvertPayloadToItems(object payload)
             {
-                var keyText = Convert.ToString(key) ?? string.Empty;
-                var value = dictionary[key];
-                resultItem.Columns[keyText] = value == null ? string.Empty : Convert.ToString(value);
+                if (payload == null)
+                {
+                    return Enumerable.Empty<ResultItem>();
+                }
+
+                if (payload is System.Collections.IDictionary dictionary)
+                {
+                    return new[] { BuildItemFromDictionary(dictionary) };
+                }
+
+                if (payload is System.Collections.IEnumerable enumerable && !(payload is string))
+                {
+                    return BuildItemsFromEnumerable(enumerable);
+                }
+
+                var collectionProperty = payload.GetType().GetProperties()
+                    .FirstOrDefault(prop => prop.PropertyType != typeof(string)
+                        && typeof(System.Collections.IEnumerable).IsAssignableFrom(prop.PropertyType));
+
+                if (collectionProperty != null)
+                {
+                    var collection = collectionProperty.GetValue(payload) as System.Collections.IEnumerable;
+                    if (collection != null)
+                    {
+                        return BuildItemsFromEnumerable(collection);
+                    }
+                }
+
+                return new[] { BuildItemFromObject(payload) };
             }
 
-            return resultItem;
+            private static IEnumerable<ResultItem> BuildItemsFromEnumerable(System.Collections.IEnumerable items)
+            {
+                var list = new List<ResultItem>();
+                foreach (var item in items)
+                {
+                    if (item == null)
+                    {
+                        continue;
+                    }
+
+                    if (item is System.Collections.IDictionary dictionary)
+                    {
+                        list.Add(BuildItemFromDictionary(dictionary));
+                    }
+                    else
+                    {
+                        list.Add(BuildItemFromObject(item));
+                    }
+                }
+
+                return list;
+            }
+
+            private static ResultItem BuildItemFromObject(object item)
+            {
+                var resultItem = new ResultItem { Severity = ResultSeverity.Info };
+                foreach (var prop in item.GetType().GetProperties())
+                {
+                    if (!prop.CanRead)
+                    {
+                        continue;
+                    }
+
+                    var value = prop.GetValue(item);
+                    resultItem.Columns[prop.Name] = value == null ? string.Empty : Convert.ToString(value);
+                }
+
+                return resultItem;
+            }
+
+            private static ResultItem BuildItemFromDictionary(System.Collections.IDictionary dictionary)
+            {
+                var resultItem = new ResultItem { Severity = ResultSeverity.Info };
+                foreach (var key in dictionary.Keys)
+                {
+                    var keyText = Convert.ToString(key) ?? string.Empty;
+                    var value = dictionary[key];
+                    resultItem.Columns[keyText] = value == null ? string.Empty : Convert.ToString(value);
+                }
+
+                return resultItem;
+            }
         }
     }
 }

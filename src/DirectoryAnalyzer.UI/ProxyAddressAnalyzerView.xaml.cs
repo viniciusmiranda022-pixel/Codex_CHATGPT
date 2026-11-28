@@ -34,11 +34,25 @@ namespace DirectoryAnalyzer.Views
             _logService = LogService.CreateLogger(ModuleName);
             _powerShellService = new PowerShellService();
             UpdateStatus("✔️ Pronto para iniciar a coleta.", "Pronto");
+            if (ModuleAvailability.TryGetUnavailable(ModuleName, out var pendingMigration))
+            {
+                // Sinaliza ao abrir a tela que este módulo ainda não é aceito pelo agente (issue #48).
+                UpdateStatus(pendingMigration.DescribeForUser("itens"), "Pronto");
+            }
             SetBusyState(false);
         }
 
         private async void RunProxyCollection(object sender, RoutedEventArgs e)
         {
+            if (ModuleAvailability.TryGetUnavailable(ModuleName, out var unavailable))
+            {
+                // Recusa local, antes de montar ou enviar o script: o agente não aceita este módulo nesta versão.
+                UpdateStatus(unavailable.DescribeForUser("itens"), unavailable.DashboardStatus);
+                _logService.Info(unavailable.DescribeForUser("itens"));
+                DashboardService.Instance.RecordModuleOutcome("ProxyAddresses Analyzer", unavailable);
+                return;
+            }
+
             Button button = sender as Button;
             if (button != null) button.IsEnabled = false;
             string correlationId = LogService.CreateCorrelationId();

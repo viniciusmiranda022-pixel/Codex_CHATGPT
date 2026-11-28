@@ -36,6 +36,11 @@ namespace DirectoryAnalyzer.ViewModels
             ExportSqlCommand = new AsyncRelayCommand(() => ExportAsync(ExportFormat.Sql), () => !IsBusy);
 
             SetStatus("✔️ Pronto para iniciar a coleta.", "Pronto");
+            if (ModuleAvailability.TryGetUnavailable(ModuleName, out var pendingMigration))
+            {
+                // Sinaliza ao abrir a tela que o módulo ainda não é aceito pelo agente (issue #48).
+                SetStatus(pendingMigration.DescribeForUser("itens"), "Pronto");
+            }
         }
 
         public ObservableCollection<DnsZoneResult> Zones { get; } = new ObservableCollection<DnsZoneResult>();
@@ -50,6 +55,15 @@ namespace DirectoryAnalyzer.ViewModels
 
         private async Task RunCollectionAsync()
         {
+            if (ModuleAvailability.TryGetUnavailable(ModuleName, out var unavailable))
+            {
+                // Recusa local antes de qualquer envio; não gera relatório vazio.
+                SetStatus(unavailable.DescribeForUser("itens"), unavailable.DashboardStatus);
+                _logService.Info(unavailable.DescribeForUser("itens"));
+                DashboardService.Instance.RecordModuleOutcome("DNS Analyzer", unavailable);
+                return;
+            }
+
             _cancellationTokenSource?.Dispose();
             _cancellationTokenSource = new CancellationTokenSource();
             var progress = new Progress<string>(message => ProgressMessage = message);

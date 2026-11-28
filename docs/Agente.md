@@ -104,6 +104,40 @@ O agente viabiliza coleta remota em ambientes onde a estação do operador não 
 
 **Provas:** `ActionRegistry`, `AgentContracts.cs`.
 
+### Catálogo e gate do agente conectado ao Broker (issue #48)
+No fluxo Broker → agente (`BrokerAgentWorker`), todo `JobRequest` passa por `ModuleRequestGate`
+(`src/DirectoryAnalyzer.Agent/Modules/`) **antes** de qualquer execução. Somente os módulos do
+`ModuleCatalog` padrão acima são aceitos, cada um com seus parâmetros declarados:
+
+| Módulo | Escopo imposto pelo agente | Parâmetros aceitos |
+| --- | --- | --- |
+| GetUsers, GetGroups, GetComputers | `defaultNamingContext` do domínio do agente (`AgentConfig.Domain` ou RootDSE local) | GetUsers: `IncludeDisabled` (true/false); demais: nenhum |
+| GetGpos | `CN=Policies,CN=System,<domínio>` | nenhum |
+| GetDnsZones | somente `CN=MicrosoftDNS,DC=DomainDnsZones,<domínio>` (ForestDnsZones nunca é consultado) | nenhum |
+
+O filtro LDAP livre (`LdapFilter`) saiu do contrato remoto: a expressão de consulta é fixa no agente e o
+pedido que o envia é recusado com `UnknownParameter`. As bases por módulo estão em `DirectorySearchBases`.
+
+Recusas voltam à WPF como `ModuleResult` sem itens, com `ErrorInfo.ExceptionType = "AgentGate"` e um dos códigos:
+`ArbitraryScriptRejected` (`RunPowerShellScript` foi removida), `ModuleNotLocal` (módulos PowerShell com
+fan-out remoto, pendentes de decisão), `UnknownModule`, `InvalidModuleName`, `UnknownParameter`,
+`InvalidParameter`, `MissingParameter`, `TargetMismatch` (job sem este agente como alvo), `AmbiguousTarget`
+(lista com mais de um alvo) e `UnsupportedContract`.
+
+O Broker exige exatamente um `TargetAgentIds` (400 `InvalidTarget`), recusa o despacho quando o agente não está
+conectado (409 `AgentUnavailable`) ou quando há mais de uma conexão com o mesmo AgentId (409 `AmbiguousTarget`,
+nada é despachado). O job fica vinculado à conexão que recebeu o despacho: somente ela pode enviar
+`ProgressUpdate`/`SubmitResult`. Se essa conexão cair antes do resultado, o job vai para `Failed`
+(`AgentDisconnected`). O job também vai para `Failed` quando o resultado só contém erros.
+
+Na WPF, `BrokerJobService.ExecuteAsync` devolve um `CollectionOutcome` que distingue coleta concluída, concluída
+sem itens, parcial, recusada (Broker ou agente), agente indisponível e módulo indisponível nesta versão; o painel
+registra o mesmo estado. As 10 telas que ainda montam script PowerShell avisam ao abrir e ao clicar, sem enviar nada
+(`ModuleAvailability`).
+Na WPF, o agente alvo é configurado em **Agentes → Agente alvo (AgentId)** (`BrokerClientSettings.TargetAgentId`).
+
+Testes: `dotnet test src/DirectoryAnalyzer.Agent.Tests` (net8.0, dados sintéticos, Broker em memória).
+
 ## Configuração do agente
 ### Arquivo `agentsettings.json`
 * Local padrão: `%ProgramData%\DirectoryAnalyzerAgent\agentsettings.json`.

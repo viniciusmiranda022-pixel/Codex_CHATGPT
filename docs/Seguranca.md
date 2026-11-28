@@ -45,8 +45,8 @@ Fornecer documentação de segurança para avaliação formal do DirectoryAnalyz
 * Provas: `AgentHost`.
 
 8) **LDAP injection nos filtros**
-* Mitigação (código): validação estrita de `LdapFilter`.
-* Provas: `ActionRegistry.IsLdapFilterSafe`.
+* Mitigação (código): o contrato remoto não aceita filtro LDAP; a expressão é fixa no agente e as bases ficam no domínio do agente (`DirectorySearchBases`).
+* Provas: `ModuleCatalog.CreateDefault`, `ModuleRequestGate`, `DirectorySearchBases` e `DirectorySearchBasesTests`.
 
 9) **Spoofing do servidor (certificado inválido)**
 * Mitigação (código): validação de cadeia e hostname/SAN.

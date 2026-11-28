@@ -25,6 +25,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryAnalyzer.Agent.Con
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryAnalyzer.Agent", "src\\DirectoryAnalyzer.Agent\\DirectoryAnalyzer.Agent.csproj", "{1FB40D11-0A06-42C8-B600-F7F361333FC2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryAnalyzer.Agent.Tests", "src\\DirectoryAnalyzer.Agent.Tests\\DirectoryAnalyzer.Agent.Tests.csproj", "{4E2B7C1A-8D3F-4B6E-9A51-2C7D0E8F1B34}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryAnalyzer.Agent.Client", "src\\DirectoryAnalyzer.Agent.Client\\DirectoryAnalyzer.Agent.Client.csproj", "{89C626AD-3CE3-4F44-BEB8-0F991969F6A4}"
 EndProject
 Global
@@ -75,6 +77,10 @@ Global
 		{1FB40D11-0A06-42C8-B600-F7F361333FC2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1FB40D11-0A06-42C8-B600-F7F361333FC2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1FB40D11-0A06-42C8-B600-F7F361333FC2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4E2B7C1A-8D3F-4B6E-9A51-2C7D0E8F1B34}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4E2B7C1A-8D3F-4B6E-9A51-2C7D0E8F1B34}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4E2B7C1A-8D3F-4B6E-9A51-2C7D0E8F1B34}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4E2B7C1A-8D3F-4B6E-9A51-2C7D0E8F1B34}.Release|Any CPU.Build.0 = Release|Any CPU
 		{89C626AD-3CE3-4F44-BEB8-0F991969F6A4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{89C626AD-3CE3-4F44-BEB8-0F991969F6A4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{89C626AD-3CE3-4F44-BEB8-0F991969F6A4}.Release|Any CPU.ActiveCfg = Release|Any CPU
