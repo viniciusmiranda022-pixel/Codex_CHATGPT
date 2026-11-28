@@ -23,6 +23,26 @@
   <ItemGroup>
     <ProjectReference Include="..\DirectoryAnalyzer.Contracts\DirectoryAnalyzer.Contracts.csproj" />
     <ProjectReference Include="..\DirectoryAnalyzer.Broker\DirectoryAnalyzer.Broker.csproj" />
+    <!--
+      Compila o agente net48 que o MSI empacota, sem referenciá-lo: InstallerPackagingTests inspeciona
+      a saída real (bin/<Configuration>/net48) contra src/Installer.
+    -->
+    <ProjectReference Include="..\DirectoryAnalyzer.Agent\DirectoryAnalyzer.Agent.csproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true"
+                      SetTargetFramework="TargetFramework=net48"
+                      Private="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>AgentOutputDir</_Parameter1>
+      <_Parameter2>$(MSBuildThisFileDirectory)..\DirectoryAnalyzer.Agent\bin\$(Configuration)\net48\</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>RepoSrcDir</_Parameter1>
+      <_Parameter2>$(MSBuildThisFileDirectory)..\</_Parameter2>
+    </AssemblyAttribute>
   </ItemGroup>
 
   <ItemGroup>

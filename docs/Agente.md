@@ -139,41 +139,34 @@ Na WPF, o agente alvo é configurado em **Agentes → Agente alvo (AgentId)** (`
 Testes: `dotnet test src/DirectoryAnalyzer.Agent.Tests` (net8.0, dados sintéticos, Broker em memória).
 
 ## Configuração do agente
-### Arquivo `agentsettings.json`
-* Local padrão: `%ProgramData%\DirectoryAnalyzerAgent\agentsettings.json`.
-* `BindPrefix` (default: `https://+:8443/agent/`)
-* `CertThumbprint`
-* `AnalyzerClientThumbprints` (allowlist)
-* `ActionTimeoutSeconds` (default 30)
-* `LogPath` (default `%ProgramData%\DirectoryAnalyzerAgent\Logs\agent.log`)
-* `Domain` (se definido, força LDAP no domínio)
-* `MaxRequestBytes` (default 65536)
-* `RequestClockSkewSeconds` (default 300)
-* `ReplayCacheMinutes` (default 10)
-* `RequireSignedRequests` (default true)
-* `MaxRequestsPerMinute` (default 60)
-* `MaxConcurrentRequests` (default 10)
-* `EnforceRevocationCheck` (default true)
-* `FailOpenOnRevocation` (default false)
+### Arquivo `agentsettings.json` e registro
+* Local padrão: `%ProgramData%\DirectoryAnalyzerAgent\agentsettings.json`. `HKLM\SOFTWARE\DirectoryAnalyzer\Agent`
+  tem precedência sobre o arquivo (`AgentConfigLoader`); sem arquivo, o serviço o cria a partir do registro.
+* Campos usados pelo agente com conexão de saída (`BrokerAgentWorker`):
+  * `BrokerUrl` (obrigatório, `https://`)
+  * `AgentId` (default: nome do computador)
+  * `BrokerClientCertificateThumbprint` (certificado de cliente em `LocalMachine\My`)
+  * `Domain` (se definido, o RootDSE é lido nesse domínio)
+  * `ActionTimeoutSeconds` (default 30)
+  * `LogPath` (default `%ProgramData%\DirectoryAnalyzerAgent\Logs\agent.log`)
+* `BindPrefix`, `CertThumbprint`, `AnalyzerClientThumbprints` e os limites de requisição pertencem ao listener de entrada
+  legado (`src/AgentService`) e não são usados por `src/DirectoryAnalyzer.Agent`.
 
-**Provas:** `AgentConfig`.
-
-### Registry overrides
-* `HKLM\SOFTWARE\DirectoryAnalyzer\Agent` (campos equivalentes).
-
-**Provas:** `AgentConfigLoader`.
+**Provas:** `AgentConfig`, `AgentConfigLoader`, `BrokerAgentWorker`.
 
 ## Instalação (MSI/WiX)
-* Instalador WiX: `Installer/Product.wxs`.
-* Parâmetros (exemplos): `LISTENPORT`, `CERTTHUMBPRINT`, `ALLOWEDCLIENTCERTTHUMBPRINTS`, `CREATEFIREWALLRULE`.
+* Instalador WiX: `src/Installer/Product.wxs` (x64), que empacota `src/DirectoryAnalyzer.Agent` (versão 1.1.0.0).
+* Parâmetros: `BROKERURL` (obrigatório), `AGENTID`, `BROKERCLIENTCERTTHUMBPRINT`, `DOMAIN`, `SERVICEACCOUNT`
+  (default `NT AUTHORITY\NetworkService`). Ver `src/Installer/README.md`.
+* Até a versão 1.0.0.0 o MSI empacotava `src/AgentService` (listener HTTPS de entrada, sem conexão com o Broker).
 
-**Provas:** `Installer/README.md`, `Product.wxs`.
+**Provas:** `src/Installer/README.md`, `Product.wxs`, `InstallerPackagingTests`.
 
 ## Regras de firewall
-* Porta padrão: **8443/TCP**.
-* O instalador **pode criar** regra se `CREATEFIREWALLRULE=1`.
+* O agente só abre conexão **de saída** HTTPS para o Broker. O MSI não cria regra de entrada.
+* Na instalação/atualização, o MSI remove a regra de entrada `DirectoryAnalyzer Agent` deixada pela versão 1.0.0.0.
 
-**Provas:** `Product.wxs` (CustomAction AddFirewallRule).
+**Provas:** `Product.wxs` (CustomAction `RemoveLegacyInboundFirewallRule`).
 
 ## Teste ponta-a-ponta
 ### Opção 1: AnalyzerClient
